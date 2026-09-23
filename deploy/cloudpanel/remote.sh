@@ -243,7 +243,10 @@ PHP
   log "10/12 Contenido de ejemplo"
   for slug in hello-world sample-page privacy-policy hola-mundo pagina-ejemplo politica-privacidad politica-de-privacidad; do
     ids="$(wp post list --post_type=post,page --post_status=any --name="$slug" --format=ids)"
-    if [[ -n "$ids" ]]; then wp post delete $ids --force --quiet; fi
+    for id in $ids; do
+      # Nunca borrar contenido importado del seed (p. ej. nuestra /politica-de-privacidad/ en es_CO).
+      if [[ -z "$(wp post meta get "$id" _bp_seed_key 2>/dev/null || true)" ]]; then wp post delete "$id" --force --quiet; fi
+    done
   done
   comments="$(wp comment list --format=ids)"
   if [[ -n "$comments" ]]; then wp comment delete $comments --force --quiet; fi
