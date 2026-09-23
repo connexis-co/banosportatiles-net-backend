@@ -65,8 +65,8 @@ it('maps gallery images to attachment IDs and reports unknown references', funct
     ]);
 
     expect($rows)->toBe([
-        ['acf_fc_layout' => 'gallery', 'title' => 'Fotos', 'items' => [900]],
-        ['acf_fc_layout' => 'equipment_grid', 'title' => '', 'items' => []],
+        ['acf_fc_layout' => 'gallery', 'title' => 'Fotos', 'intro' => '', 'items' => [900]],
+        ['acf_fc_layout' => 'equipment_grid', 'title' => '', 'intro' => '', 'items' => []],
     ])->and($warnings)->toHaveCount(2);
 });
 

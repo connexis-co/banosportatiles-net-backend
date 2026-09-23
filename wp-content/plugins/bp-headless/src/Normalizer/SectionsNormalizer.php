@@ -49,12 +49,11 @@ final class SectionsNormalizer
      */
     private function fields(string $layout, array $row): ?array
     {
-        $head = Arr::withoutEmpty(['title' => Arr::string($row, 'title')]);
+        $head = Arr::withoutEmpty(['title' => Arr::string($row, 'title'), 'intro' => Arr::string($row, 'intro')]);
 
         return match ($layout) {
             'contenido' => [],
-            'features_grid' => $head + Arr::withoutEmpty(['intro' => Arr::string($row, 'intro')])
-                + ['items' => $this->items($row, ['icon', 'title', 'text'])],
+            'features_grid' => $head + ['items' => $this->items($row, ['icon', 'title', 'text'])],
             'steps' => $head + ['items' => $this->items($row, ['title', 'text'])],
             'pricing_factors' => $head + ['items' => $this->items($row, ['factor', 'detalle'])]
                 + Arr::withoutEmpty(['disclaimer' => Arr::string($row, 'disclaimer')]),

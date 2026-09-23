@@ -253,13 +253,14 @@ final class FieldValueMapper
     private function section(string $layout, array $section): ?array
     {
         $title = ['title' => Arr::string($section, 'title')];
+        $intro = ['intro' => Arr::string($section, 'intro')];
 
         return match ($layout) {
             'contenido' => [],
-            'features_grid' => $title + ['intro' => Arr::string($section, 'intro'), 'items' => self::rows($section, ['icon', 'title', 'text'])],
-            'steps' => $title + ['items' => self::rows($section, ['title', 'text'])],
-            'pricing_factors' => $title + ['items' => self::rows($section, ['factor', 'detalle']), 'disclaimer' => Arr::string($section, 'disclaimer')],
-            'comparison_table' => $title + [
+            'features_grid' => $title + $intro + ['items' => self::rows($section, ['icon', 'title', 'text'])],
+            'steps' => $title + $intro + ['items' => self::rows($section, ['title', 'text'])],
+            'pricing_factors' => $title + $intro + ['items' => self::rows($section, ['factor', 'detalle']), 'disclaimer' => Arr::string($section, 'disclaimer')],
+            'comparison_table' => $title + $intro + [
                 'columns' => array_map(static fn (string $label): array => ['label' => $label], Arr::strings($section, 'columns')),
                 'rows' => array_map(
                     static fn (mixed $row): array => ['cells' => array_map(
@@ -270,10 +271,10 @@ final class FieldValueMapper
                 ),
                 'note' => Arr::string($section, 'note'),
             ],
-            'equipment_grid' => $title + ['items' => $this->ids(Arr::strings($section, 'items'), $this->lookup->equipoId(...), 'equipo')],
-            'services_grid' => $title + ['items' => $this->ids(Arr::strings($section, 'items'), $this->lookup->pageId(...), 'servicio')],
-            'coverage' => $title + ['items' => $this->ids(Arr::strings($section, 'items'), $this->lookup->ciudadId(...), 'ciudad')],
-            'related_posts' => $title + ['items' => $this->ids(Arr::strings($section, 'items'), $this->lookup->postId(...), 'post')],
+            'equipment_grid' => $title + $intro + ['items' => $this->ids(Arr::strings($section, 'items'), $this->lookup->equipoId(...), 'equipo')],
+            'services_grid' => $title + $intro + ['items' => $this->ids(Arr::strings($section, 'items'), $this->lookup->pageId(...), 'servicio')],
+            'coverage' => $title + $intro + ['items' => $this->ids(Arr::strings($section, 'items'), $this->lookup->ciudadId(...), 'ciudad')],
+            'related_posts' => $title + $intro + ['items' => $this->ids(Arr::strings($section, 'items'), $this->lookup->postId(...), 'post')],
             'callout' => [
                 'variant' => Arr::string($section, 'variant') ?: 'info',
                 'title' => Arr::string($section, 'title'),
@@ -281,7 +282,7 @@ final class FieldValueMapper
                 'source' => ['title' => Arr::string(Arr::array($section, 'source'), 'title'), 'url' => Arr::string(Arr::array($section, 'source'), 'url')],
             ],
             'cta_banner' => $title + ['text' => Arr::string($section, 'text'), 'cta' => self::link(Arr::array($section, 'cta'))],
-            'gallery' => $title + ['items' => array_values(array_filter(array_map(
+            'gallery' => $title + $intro + ['items' => array_values(array_filter(array_map(
                 $this->lookup->imageId(...),
                 array_values(Arr::array($section, 'items'))
             )))],

@@ -98,6 +98,7 @@ final class FieldGroups
             ]],
             'steps' => ['label' => 'Pasos', 'fields' => static fn (FieldBuilder $l): array => [
                 $title($l),
+                $l->textarea('intro', 'Introducción'),
                 $l->repeater('items', 'Pasos', static fn (FieldBuilder $i): array => [
                     $i->text('title', 'Título'),
                     $i->textarea('text', 'Texto'),
@@ -105,6 +106,7 @@ final class FieldGroups
             ]],
             'pricing_factors' => ['label' => 'Factores de precio', 'fields' => static fn (FieldBuilder $l): array => [
                 $title($l),
+                $l->textarea('intro', 'Introducción'),
                 $l->repeater('items', 'Factores', static fn (FieldBuilder $i): array => [
                     $i->text('factor', 'Factor'),
                     $i->textarea('detalle', 'Detalle'),
@@ -113,6 +115,7 @@ final class FieldGroups
             ]],
             'comparison_table' => ['label' => 'Tabla comparativa', 'fields' => static fn (FieldBuilder $l): array => [
                 $title($l),
+                $l->textarea('intro', 'Introducción'),
                 $l->repeater('columns', 'Columnas', static fn (FieldBuilder $c): array => [
                     $c->text('label', 'Encabezado'),
                 ]),
@@ -125,14 +128,17 @@ final class FieldGroups
             ]],
             'equipment_grid' => ['label' => 'Grid de equipos', 'fields' => static fn (FieldBuilder $l): array => [
                 $title($l),
+                $l->textarea('intro', 'Introducción'),
                 $l->relationship('items', 'Equipos', [PostTypes::EQUIPO]),
             ]],
             'services_grid' => ['label' => 'Grid de servicios', 'fields' => static fn (FieldBuilder $l): array => [
                 $title($l),
+                $l->textarea('intro', 'Introducción'),
                 $l->relationship('items', 'Páginas', ['page'], ['instructions' => 'Vacío = páginas hijas.']),
             ]],
             'coverage' => ['label' => 'Cobertura', 'fields' => static fn (FieldBuilder $l): array => [
                 $title($l),
+                $l->textarea('intro', 'Introducción'),
                 $l->taxonomy('items', 'Ciudades', Taxonomies::CIUDAD, ['instructions' => 'Vacío = todas.']),
             ]],
             'callout' => ['label' => 'Destacado', 'fields' => static fn (FieldBuilder $l): array => [
@@ -146,6 +152,7 @@ final class FieldGroups
             ]],
             'related_posts' => ['label' => 'Guías relacionadas', 'fields' => static fn (FieldBuilder $l): array => [
                 $title($l),
+                $l->textarea('intro', 'Introducción'),
                 $l->relationship('items', 'Posts', ['post']),
             ]],
             'cta_banner' => ['label' => 'Banner CTA', 'fields' => static fn (FieldBuilder $l): array => [
@@ -155,6 +162,7 @@ final class FieldGroups
             ]],
             'gallery' => ['label' => 'Galería', 'fields' => static fn (FieldBuilder $l): array => [
                 $title($l),
+                $l->textarea('intro', 'Introducción'),
                 $l->gallery('items', 'Imágenes'),
             ]],
         ];
