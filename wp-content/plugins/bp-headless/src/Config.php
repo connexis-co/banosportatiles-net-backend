@@ -11,6 +11,10 @@ final class Config
 {
     public const DEFAULT_FRONTEND_URL = 'https://banosportatiles.net';
 
+    public const DEFAULT_LEADS_EMAIL_TO = 'contacto@banosportatiles.net';
+
+    public const DEFAULT_LEADS_EMAIL_CC = 'connexis.co@gmail.com';
+
     /** ACF options page storage prefix ("post_id" of the "Ajustes del sitio" page). */
     public const OPTIONS_ID = 'bp_site';
 
@@ -73,15 +77,58 @@ final class Config
         return self::validUrl($url !== '' ? $url : $this->option('forms_leads_webhook_url'));
     }
 
-    public function leadsNotifyEmail(): string
+    /**
+     * Lead email recipients: BP_LEADS_EMAIL_TO → "Ajustes del sitio → Formularios" → contacto@banosportatiles.net.
+     *
+     * @return list<string>
+     */
+    public function leadsEmailTo(): array
     {
-        foreach ([$this->option('forms_leads_email'), $this->option('contact_email'), (string) get_option('admin_email')] as $email) {
-            if ($email !== '' && is_email($email) !== false) {
-                return $email;
+        foreach ([$this->read('BP_LEADS_EMAIL_TO'), $this->option('forms_leads_email'), self::DEFAULT_LEADS_EMAIL_TO] as $value) {
+            $emails = self::emails($value);
+            if ($emails !== []) {
+                return $emails;
             }
         }
 
-        return '';
+        return [];
+    }
+
+    /**
+     * Copies: BP_LEADS_EMAIL_CC (comma separated; "none" disables) → connexis.co@gmail.com. Never repeats a TO address.
+     *
+     * @return list<string>
+     */
+    public function leadsEmailCc(): array
+    {
+        $value = $this->read('BP_LEADS_EMAIL_CC');
+        if (strtolower($value) === 'none') {
+            return [];
+        }
+        $to = array_map('strtolower', $this->leadsEmailTo());
+
+        return array_values(array_filter(
+            self::emails($value !== '' ? $value : self::DEFAULT_LEADS_EMAIL_CC),
+            static fn (string $email): bool => ! in_array(strtolower($email), $to, true)
+        ));
+    }
+
+    /**
+     * Valid, unique addresses from a comma/semicolon separated list.
+     *
+     * @return list<string>
+     */
+    public static function emails(string $list): array
+    {
+        $emails = [];
+        foreach (preg_split('/[,;]+/', $list) ?: [] as $candidate) {
+            $candidate = trim($candidate);
+            if ($candidate !== '' && filter_var($candidate, FILTER_VALIDATE_EMAIL) !== false) {
+                $emails[strtolower($candidate)] = $candidate;
+            }
+        }
+
+        return array_values($emails);
     }
 
     /**
@@ -100,18 +147,32 @@ final class Config
     }
 
     /**
-     * @return array{host: string, port: int, user: string, pass: string, secure: string, from: string}
+     * SMTP transport for wp_mail (Brevo in production: smtp-relay.brevo.com:587 + STARTTLS).
+     *
+     * @return array{host: string, port: int, user: string, pass: string, secure: string, from: string, from_name: string}
      */
     public function smtp(): array
     {
+        $port = (int) $this->read('BP_SMTP_PORT');
+
         return [
             'host' => $this->read('BP_SMTP_HOST'),
-            'port' => (int) ($this->read('BP_SMTP_PORT') ?: 587),
+            'port' => $port > 0 ? $port : 587,
             'user' => $this->read('BP_SMTP_USER'),
             'pass' => $this->read('BP_SMTP_PASS'),
-            'secure' => $this->read('BP_SMTP_SECURE'),
+            'secure' => strtolower($this->read('BP_SMTP_SECURE')),
             'from' => $this->read('BP_SMTP_FROM'),
+            'from_name' => $this->read('BP_SMTP_FROM_NAME'),
         ];
+    }
+
+    /**
+     * BP_LEADS_EMAIL (default true). Set it to false when the Astro Worker already emails each lead,
+     * so POST /bp/v1/leads only stores it and duplicates are avoided.
+     */
+    public function leadsEmailEnabled(): bool
+    {
+        return $this->flag('BP_LEADS_EMAIL', true);
     }
 
     public function isLocal(): bool
@@ -142,6 +203,27 @@ final class Config
         $url = trim($url);
 
         return ($url !== '' && filter_var($url, FILTER_VALIDATE_URL) !== false && preg_match('#^https?://#i', $url) === 1) ? $url : '';
+    }
+
+    /** Boolean setting: true/false constants, or "1|0|true|false|yes|no|on|off" strings (empty = default). */
+    private function flag(string $name, bool $default): bool
+    {
+        if (defined($name)) {
+            $value = constant($name);
+            if (is_bool($value)) {
+                return $value;
+            }
+            if (is_int($value)) {
+                return $value !== 0;
+            }
+        }
+
+        $raw = strtolower($this->read($name));
+        if ($raw === '') {
+            return $default;
+        }
+
+        return ! in_array($raw, ['0', 'false', 'no', 'off'], true);
     }
 
     private function read(string $name): string

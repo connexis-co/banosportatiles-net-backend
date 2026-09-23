@@ -3,7 +3,7 @@
 # Usage: tests/smoke.sh
 set -uo pipefail
 
-cd "$(dirname "${BASH_SOURCE[0]}")/.."
+cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 # shellcheck source=../bin/lib.sh
 source bin/lib.sh
 bp_load_env
@@ -42,6 +42,8 @@ post_lead() { # post_lead <name> <expected> <body> [timestamp] [signature-overri
 }
 
 cleanup() {
+  wp config delete BP_LEADS_EMAIL --type=constant >/dev/null
+  wp config delete BP_SMTP_PASS --type=constant >/dev/null
   wp option delete bp_site_deploy_hook_url >/dev/null
   wp option delete bp_site_forms_leads_webhook_url >/dev/null
   local leads
@@ -72,6 +74,7 @@ expect_json "brand, contacto y legal (NIT/razón social/dirección)" '.brand.nam
 expect_json "sale_banner con enabled booleano" '.sale_banner.enabled | type == "boolean"'
 expect_json "menús header (con hijos) y footer" '(.menus.header | length > 0) and (.menus.header[0].children | type == "array") and (.menus.footer[0].links | type == "array")'
 expect_json "ciudades con coordenadas y categorías con pilar" '(.ciudades | length == 2) and (.ciudades[0].lat | type == "number") and (.categorias[0].pillarUri == "/blog/pozo-septico-guia/")'
+expect_json "ciudades con autoridad_ambiental" '(.ciudades | map(select(.slug == "medellin"))[0].autoridad_ambiental) == "Área Metropolitana del Valle de Aburrá (AMVA)"'
 expect_header "Cache-Control público" 'Cache-Control: public, max-age=30'
 expect_header "X-Robots-Tag en REST" 'X-Robots-Tag: noindex, nofollow'
 etag="$(grep -i '^ETag:' "$TMP/headers" | cut -d' ' -f2 | tr -d '\r')"
@@ -100,6 +103,7 @@ http "GET /content?type=lead (no permitido)" 400 "$API/content?type=lead"
 section "4. GET /node"
 http "GET /node?uri=/alquiler-de-banos-portatiles/medellin/" 200 "$API/node?uri=/alquiler-de-banos-portatiles/medellin/"
 expect_json "parent, breadcrumbs y ciudad" '.parent.uri == "/alquiler-de-banos-portatiles/" and (.breadcrumbs | map(.uri)) == ["/","/alquiler-de-banos-portatiles/","/alquiler-de-banos-portatiles/medellin/"] and .terms.ciudad[0].slug == "medellin"'
+expect_json "terms.ciudad con autoridad_ambiental" '.terms.ciudad[0].autoridad_ambiental == "Área Metropolitana del Valle de Aburrá (AMVA)"'
 expect_json "contentHtml: ids en h2 y enlaces internos relativos" '(.contentHtml | test("<h2 id=\"banos-portatiles-en-medellin\"")) and (.contentHtml | test("href=\"/alquiler-de-banos-portatiles/\"")) and (.contentHtml | test("localhost:8080/alquiler") | not)'
 http "GET /node?uri=/alquiler-de-banos-portatiles/ (FAQs inline + banco)" 200 "$API/node?uri=/alquiler-de-banos-portatiles/"
 expect_json "FAQs inline + refs, hijos ordenados e ids únicos" '(.faqs | length == 3) and (.children | map(.uri)) == ["/alquiler-de-banos-portatiles/medellin/","/alquiler-de-banos-portatiles/cali/"] and (.contentHtml | test("que-debe-incluir-el-alquiler-2"))'
@@ -137,7 +141,14 @@ expect_json "errores por campo" '.data.errors | has("nombre") and has("telefono"
 lead_count="$(wp post list --post_type=lead --post_status=any --meta_key=_bp_lead_pagina --meta_value=/smoke-test/ --format=count)"
 [[ "$lead_count" == "1" ]] && ok "lead guardado como CPT privado" || ko "lead guardado ($lead_count)"
 sleep 1
-if curl -s "$MAILPIT/api/v1/messages" | jq -e '.total >= 1 and (.messages[0].Subject | test("Nuevo lead"))' >/dev/null; then ok "email de aviso recibido en Mailpit"; else ko "email de aviso en Mailpit"; fi
+curl -s "$MAILPIT/api/v1/messages" > "$TMP/body"
+expect_json "email del lead: asunto «Nueva cotización: … en Medellín — …»" '.messages[0].Subject == "Nueva cotización: Alquiler para evento en Medellín — Prueba Smoke"'
+expect_json "destinatarios: To contacto@, Cc connexis.co@gmail.com, Reply-To del prospecto" '(.messages[0].To | map(.Address)) == ["contacto@banosportatiles.net"] and (.messages[0].Cc | map(.Address)) == ["connexis.co@gmail.com"] and (.messages[0].ReplyTo | map(.Address)) == ["smoke@example.com"]'
+msg_id="$(jq -r '.messages[0].ID' "$TMP/body")"
+curl -s "$MAILPIT/api/v1/message/$msg_id" > "$TMP/body"
+expect_json "cuerpo HTML con todos los campos, URL de origen, UTM y hora de Colombia" "(.HTML | test(\"Comunicaciones comerciales\")) and (.HTML | contains(\"$FRONT/smoke-test/\")) and (.HTML | test(\"source=smoke\")) and (.HTML | test(\"hora de Colombia\")) and (.Text | contains(\"Teléfono: +573000000000\"))"
+lead_id="$(wp post list --post_type=lead --post_status=any --meta_key=_bp_lead_telefono --meta_value=+573000000000 --field=ID | head -1)"
+[[ "$(wp post meta get "$lead_id" _bp_lead_status)" == "email_sent" ]] && ok "meta del lead: status=email_sent" || ko "meta _bp_lead_status (email_sent)"
 wp cron event run bp_headless_lead_webhook >/dev/null
 sink="$(docker compose exec -T hook-sink cat /sink/requests.log 2>/dev/null)"
 wh="$(printf '%s\n' "$sink" | grep '"path":"/leads"' | tail -1)"
@@ -156,6 +167,46 @@ for i in 1 2 3 4 5 6; do
   if [[ "$code" == "429" ]]; then limited=$i; break; fi
 done
 [[ "$limited" -gt 0 ]] && ok "rate limit por IP → 429 en el intento $limited" || ko "rate limit por IP"
+
+section "7b. BP_LEADS_EMAIL=false (el Worker ya envía el email)"
+wp config set BP_LEADS_EMAIL false --raw --type=constant >/dev/null
+sleep 3 # OPcache revalidates wp-config.php every 2 s in the official image
+before="$(curl -s "$MAILPIT/api/v1/messages" | jq '.total')"
+NOMAIL='{"nombre":"Prueba Sin Email","telefono":"3000000001","pagina":"/smoke-test/","consentimiento":true}'
+ts="$(date +%s)"
+code="$(curl -s -o "$TMP/body" -w '%{http_code}' -X POST "$API/leads" -H 'Content-Type: application/json' -H "X-BP-Timestamp: $ts" -H "X-BP-Signature: sha256=$(sign "$ts" "$NOMAIL")" -H "X-BP-Client-IP: 198.51.100.$((RANDOM % 250 + 1))" --data-binary "$NOMAIL")"
+[[ "$code" == "201" ]] && ok "lead guardado con BP_LEADS_EMAIL=false → 201" || ko "lead con BP_LEADS_EMAIL=false → $code"
+nomail_id="$(wp post list --post_type=lead --post_status=any --meta_key=_bp_lead_telefono --meta_value=3000000001 --field=ID | head -1)"
+[[ "$(wp post meta get "$nomail_id" _bp_lead_status)" == "email_disabled" ]] && ok "meta del lead: status=email_disabled" || ko "meta _bp_lead_status (email_disabled)"
+sleep 1
+[[ "$(curl -s "$MAILPIT/api/v1/messages" | jq '.total')" == "$before" ]] && ok "no se envió email duplicado" || ko "se envió un email con BP_LEADS_EMAIL=false"
+wp config delete BP_LEADS_EMAIL --type=constant >/dev/null
+sleep 3
+
+section "7c. Fallo de SMTP: el lead se guarda con status=email_failed y se reenvía con WP-CLI"
+wp config set BP_SMTP_PASS 'clave-incorrecta' --type=constant >/dev/null
+sleep 3
+FAILMAIL='{"nombre":"Prueba Fallo SMTP","telefono":"3000000002","servicio":"Venta","pagina":"/smoke-test/","consentimiento":true}'
+ts="$(date +%s)"
+code="$(curl -s -o /dev/null -w '%{http_code}' -X POST "$API/leads" -H 'Content-Type: application/json' -H "X-BP-Timestamp: $ts" -H "X-BP-Signature: sha256=$(sign "$ts" "$FAILMAIL")" -H "X-BP-Client-IP: 192.0.2.$((RANDOM % 250 + 1))" --data-binary "$FAILMAIL")"
+[[ "$code" == "201" ]] && ok "SMTP caído: el lead igual se guarda → 201" || ko "lead con SMTP caído → $code"
+wp config delete BP_SMTP_PASS --type=constant >/dev/null
+sleep 3
+fail_id="$(wp post list --post_type=lead --post_status=any --meta_key=_bp_lead_telefono --meta_value=3000000002 --field=ID | head -1)"
+[[ "$(wp post meta get "$fail_id" _bp_lead_status)" == "email_failed" && -n "$(wp post meta get "$fail_id" _bp_lead_email_error)" ]] && ok "status=email_failed con el error registrado" || ko "status email_failed"
+before="$(curl -s "$MAILPIT/api/v1/messages" | jq '.total')"
+wp bp leads resend "$fail_id" >/dev/null && ok "wp bp leads resend $fail_id → enviado" || ko "wp bp leads resend"
+[[ "$(wp post meta get "$fail_id" _bp_lead_status)" == "email_sent" && "$(wp post meta get "$fail_id" _bp_lead_email_attempts)" == "2" ]] && ok "status=email_sent tras el reintento (2 intentos)" || ko "status tras reenvío"
+sleep 1
+[[ "$(curl -s "$MAILPIT/api/v1/messages" | jq '.total')" -gt "$before" ]] && ok "el reenvío llegó a Mailpit" || ko "reenvío en Mailpit"
+
+section "7d. SMTP tipo Brevo (STARTTLS + AUTH obligatorios en Mailpit)"
+curl -s -X DELETE "$MAILPIT/api/v1/messages" >/dev/null
+[[ "$(wp eval 'echo retrieve_password("bp-admin") === true ? "ok" : "fail";')" == "ok" ]] && ok "wp_mail de sistema (restablecer contraseña) enviado" || ko "retrieve_password"
+sleep 1
+curl -s "$MAILPIT/api/v1/messages" > "$TMP/body"
+expect_json "llega por SMTP con From/FromName de BP_SMTP_FROM(_NAME)" "(.messages[0].Subject | test(\"contraseña\")) and .messages[0].From.Address == \"${BP_SMTP_FROM:-no-reply@banosportatiles.net}\" and .messages[0].From.Name == \"${BP_SMTP_FROM_NAME:-BañosPortátiles.net}\""
+[[ "$(wp eval 'add_action("phpmailer_init", function ($m) { $m->Password = "incorrecta"; }, 20); echo wp_mail("x@example.com", "t", "b") ? "sent" : "rejected";')" == "rejected" ]] && ok "credenciales SMTP incorrectas → rechazado (AUTH obligatorio)" || ko "AUTH SMTP no se exige"
 
 section "8. Headless: redirección del front, noindex y previews"
 http "front del CMS → 301" 301 "$BASE/cualquier/ruta/?utm_source=x"

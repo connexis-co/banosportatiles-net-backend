@@ -12,9 +12,11 @@ use BanosPortatiles\Headless\Headless\PreviewLinks;
 use BanosPortatiles\Headless\Import\Bundle;
 use BanosPortatiles\Headless\Import\ImportReport;
 use BanosPortatiles\Headless\Import\SeedImporter;
+use BanosPortatiles\Headless\Leads\LeadNotifier;
+use BanosPortatiles\Headless\Leads\LeadRepository;
 
 /**
- * wp bp import-seed | deploy | cache flush | preview-url
+ * wp bp import-seed | deploy | cache flush | preview-url | leads resend
  */
 final class BpCommand
 {
@@ -24,6 +26,8 @@ final class BpCommand
         private readonly ResponseCache $cache,
         private readonly ContentChangeListener $listener,
         private readonly PreviewLinks $previews,
+        private readonly LeadRepository $leads,
+        private readonly LeadNotifier $notifier,
     ) {}
 
     public static function register(self $command): void
@@ -43,6 +47,13 @@ final class BpCommand
         ]);
         \WP_CLI::add_command('bp cache flush', [$command, 'flushCache'], [
             'shortdesc' => 'Vacía la caché de respuestas de la API bp/v1.',
+        ]);
+        \WP_CLI::add_command('bp leads resend', [$command, 'resendLeads'], [
+            'shortdesc' => 'Reenvía el email de aviso de uno o varios leads (p. ej. los que quedaron en email_failed).',
+            'synopsis' => [
+                ['type' => 'positional', 'name' => 'id', 'description' => 'ID del lead.', 'optional' => true, 'repeating' => true],
+                ['type' => 'flag', 'name' => 'failed', 'description' => 'Todos los leads con _bp_lead_status = email_failed.', 'optional' => true],
+            ],
         ]);
         \WP_CLI::add_command('bp preview-url', [$command, 'previewUrl'], [
             'shortdesc' => 'Imprime la URL de preview firmada (15 min) de un contenido.',
@@ -122,6 +133,55 @@ final class BpCommand
     {
         $this->cache->flush();
         \WP_CLI::success('Caché de la API vaciada.');
+    }
+
+    /**
+     * @param  list<string>  $args
+     * @param  array<string, string|bool>  $assoc
+     */
+    public function resendLeads(array $args, array $assoc): void
+    {
+        $ids = array_map('intval', $args);
+        if ((bool) \WP_CLI\Utils\get_flag_value($assoc, 'failed', false)) {
+            $ids = [...$ids, ...get_posts([
+                'post_type' => 'lead',
+                'post_status' => 'any',
+                'meta_key' => LeadRepository::META_PREFIX.'status',
+                'meta_value' => LeadNotifier::STATUS_FAILED,
+                'fields' => 'ids',
+                'numberposts' => -1,
+                'no_found_rows' => true,
+            ])];
+        }
+        $ids = array_values(array_unique(array_filter($ids, static fn (int $id): bool => $id > 0)));
+        if ($ids === []) {
+            \WP_CLI::error('Indica uno o más IDs de lead, o usa --failed.');
+
+            return;
+        }
+
+        $failed = 0;
+        foreach ($ids as $id) {
+            $stored = $this->leads->load($id);
+            if ($stored === null) {
+                \WP_CLI::warning("#{$id} no es un lead.");
+                $failed++;
+
+                continue;
+            }
+            $status = $this->notifier->notify($id, $stored['lead'], $stored['reference']);
+            if ($status === LeadNotifier::STATUS_SENT) {
+                \WP_CLI::log("#{$id}: enviado.");
+
+                continue;
+            }
+            $failed++;
+            \WP_CLI::warning("#{$id}: {$status} ".LeadRepository::meta($id, 'email_error'));
+        }
+
+        $failed === 0
+            ? \WP_CLI::success(sprintf('%d email(s) reenviado(s).', count($ids)))
+            : \WP_CLI::error(sprintf('%d de %d no se pudieron reenviar.', $failed, count($ids)));
     }
 
     /**

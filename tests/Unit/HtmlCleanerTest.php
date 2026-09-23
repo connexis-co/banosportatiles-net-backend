@@ -6,7 +6,7 @@ use BanosPortatiles\Headless\Html\HtmlCleaner;
 
 function cleaner(?callable $mapper = null): HtmlCleaner
 {
-    return new HtmlCleaner(['banosportatiles.net', 'www.banosportatiles.net'], 'https://api.banosportatiles.net', $mapper);
+    return new HtmlCleaner(['banosportatiles.net', 'www.banosportatiles.net'], 'https://admin.banosportatiles.net', $mapper);
 }
 
 it('rewrites links to the public host as relative URIs with a trailing slash', function (string $href, string $expected): void {
@@ -27,10 +27,10 @@ it('rewrites links to the public host as relative URIs with a trailing slash', f
 it('maps CMS permalinks through the resolver and keeps CMS-only paths absolute', function (): void {
     $cleaner = cleaner(fn (string $path): ?string => $path === '/pozo-septico-guia/' ? '/blog/pozo-septico-guia/' : null);
 
-    expect($cleaner->rewriteHref('https://api.banosportatiles.net/pozo-septico-guia/#mantenimiento'))->toBe('/blog/pozo-septico-guia/#mantenimiento')
-        ->and($cleaner->rewriteHref('https://api.banosportatiles.net/alquiler/medellin'))->toBe('/alquiler/medellin/')
-        ->and($cleaner->rewriteHref('https://api.banosportatiles.net/wp-content/uploads/a.pdf'))->toBe('https://api.banosportatiles.net/wp-content/uploads/a.pdf')
-        ->and($cleaner->rewriteHref('https://api.banosportatiles.net/wp-admin/'))->toBe('https://api.banosportatiles.net/wp-admin/');
+    expect($cleaner->rewriteHref('https://admin.banosportatiles.net/pozo-septico-guia/#mantenimiento'))->toBe('/blog/pozo-septico-guia/#mantenimiento')
+        ->and($cleaner->rewriteHref('https://admin.banosportatiles.net/alquiler/medellin'))->toBe('/alquiler/medellin/')
+        ->and($cleaner->rewriteHref('https://admin.banosportatiles.net/wp-content/uploads/a.pdf'))->toBe('https://admin.banosportatiles.net/wp-content/uploads/a.pdf')
+        ->and($cleaner->rewriteHref('https://admin.banosportatiles.net/wp-admin/'))->toBe('https://admin.banosportatiles.net/wp-admin/');
 });
 
 it('distinguishes hosts by port (local CMS vs local front)', function (): void {
@@ -77,8 +77,8 @@ it('keeps UTF-8 text, drops empty paragraphs and hardens images and blank target
 
     expect($html)->toContain('Baños portátiles en Medellín — «guía»')
         ->and(substr_count($html, '<p>'))->toBe(3)
-        ->and($html)->toContain('src="https://api.banosportatiles.net/wp-content/uploads/a.webp"')
-        ->toContain('https://api.banosportatiles.net/wp-content/uploads/a@2x.webp 2x')
+        ->and($html)->toContain('src="https://admin.banosportatiles.net/wp-content/uploads/a.webp"')
+        ->toContain('https://admin.banosportatiles.net/wp-content/uploads/a@2x.webp 2x')
         ->toContain('loading="lazy"')
         ->toContain('rel="noopener noreferrer"');
 });

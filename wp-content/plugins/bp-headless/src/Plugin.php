@@ -32,6 +32,7 @@ use BanosPortatiles\Headless\Leads\LeadValidator;
 use BanosPortatiles\Headless\Leads\LeadWebhook;
 use BanosPortatiles\Headless\Leads\RateLimiter;
 use BanosPortatiles\Headless\Mail\SmtpMailer;
+use BanosPortatiles\Headless\Normalizer\CiudadNormalizer;
 use BanosPortatiles\Headless\Normalizer\FaqNormalizer;
 use BanosPortatiles\Headless\Normalizer\HeroNormalizer;
 use BanosPortatiles\Headless\Normalizer\NodeNormalizer;
@@ -89,6 +90,7 @@ final class Plugin
         $renderer = new ContentRenderer($cleaner);
         $refs = new WpReferenceResolver($uris, $renderer);
         $fields = new AcfFieldReader;
+        $ciudades = new CiudadNormalizer($fields);
         $nodes = new NodeNormalizer(
             $fields,
             $refs,
@@ -98,6 +100,7 @@ final class Plugin
             new HeroNormalizer($refs),
             new SectionsNormalizer($refs),
             new FaqNormalizer($refs, $renderer->fragment(...)),
+            $ciudades,
         );
         $tokens = new PreviewToken($config->previewSecret());
         $previews = new PreviewLinks($config, $uris, $tokens);
@@ -105,6 +108,8 @@ final class Plugin
         $listener = new ContentChangeListener;
         $scheduler = new DeployScheduler($config, new DeployHook($config));
         $webhook = new LeadWebhook($config);
+        $leads = new LeadRepository;
+        $notifier = new LeadNotifier($config);
 
         /** @var list<Hookable> $modules */
         $modules = [
@@ -113,13 +118,13 @@ final class Plugin
             new PageTemplates,
             new FieldRegistrar($config),
             new RestApi(
-                new SiteController($cache, new SiteNormalizer($fields, $refs, $uris)),
+                new SiteController($cache, new SiteNormalizer($fields, $refs, $uris, $ciudades)),
                 new RoutesController($cache, $uris),
                 new ContentController($cache, $nodes),
                 new NodeController($cache, $nodes, $uris, $tokens),
                 new FaqsController($cache, $renderer),
                 new RedirectsController($cache, $redirects),
-                new LeadsController($config, new LeadValidator, new LeadRepository, new LeadNotifier($config), $webhook, new RateLimiter),
+                new LeadsController($config, new LeadValidator, $leads, $notifier, $webhook, new RateLimiter),
             ),
             new HttpCache,
             new Cors($config),
@@ -146,7 +151,7 @@ final class Plugin
         }
 
         if (defined('WP_CLI') && WP_CLI) {
-            BpCommand::register(new BpCommand(new SeedImporter($uris, $redirects), $scheduler, $cache, $listener, $previews));
+            BpCommand::register(new BpCommand(new SeedImporter($uris, $redirects), $scheduler, $cache, $listener, $previews, $leads, $notifier));
         }
     }
 

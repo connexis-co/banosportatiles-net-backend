@@ -24,6 +24,7 @@ final readonly class LeadData
         public ?string $pagina = null,
         public array $utm = [],
         public bool $consentimiento = true,
+        public bool $consentimientoComercial = false,
     ) {}
 
     /**
@@ -43,6 +44,7 @@ final readonly class LeadData
             'pagina' => $this->pagina,
             'utm' => $this->utm,
             'consentimiento' => $this->consentimiento,
+            'consentimiento_comercial' => $this->consentimientoComercial,
         ];
     }
 }

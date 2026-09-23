@@ -2,7 +2,7 @@
 # Pushes local code (plugin, theme, scripts, seed) into the containers when running in sync mode.
 # With live bind mounts this is a no-op. Usage: bin/sync.sh
 set -euo pipefail
-cd "$(dirname "${BASH_SOURCE[0]}")/.."
+cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 # shellcheck source=lib.sh
 source bin/lib.sh
 bp_load_env

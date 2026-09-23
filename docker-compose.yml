@@ -1,4 +1,4 @@
-# Local development stack for the headless CMS (api.banosportatiles.net).
+# Local development stack for the headless CMS (admin.banosportatiles.net).
 # Usage: bin/setup.sh (idempotent). Never used in production.
 name: banosportatiles-cms
 
@@ -24,9 +24,17 @@ x-wp-env: &wp-env
   BP_PREVIEW_SECRET: ${BP_PREVIEW_SECRET:?Run bin/setup.sh to generate backend/.env}
   BP_DEPLOY_HOOK_URL: ${BP_DEPLOY_HOOK_URL:-}
   BP_LEADS_WEBHOOK_URL: ${BP_LEADS_WEBHOOK_URL:-}
+  BP_LEADS_EMAIL: ${BP_LEADS_EMAIL:-true}
+  BP_LEADS_EMAIL_TO: ${BP_LEADS_EMAIL_TO:-}
+  BP_LEADS_EMAIL_CC: ${BP_LEADS_EMAIL_CC:-}
+  # SMTP like Brevo (STARTTLS + AUTH), against the local Mailpit.
   BP_SMTP_HOST: ${BP_SMTP_HOST:-mailpit}
   BP_SMTP_PORT: ${BP_SMTP_PORT:-1025}
+  BP_SMTP_SECURE: ${BP_SMTP_SECURE:-tls}
+  BP_SMTP_USER: ${BP_SMTP_USER:-bp-smtp}
+  BP_SMTP_PASS: ${BP_SMTP_PASS:?Run bin/setup.sh to generate backend/.env}
   BP_SMTP_FROM: ${BP_SMTP_FROM:-no-reply@banosportatiles.net}
+  BP_SMTP_FROM_NAME: ${BP_SMTP_FROM_NAME:-BañosPortátiles.net}
 
 x-wp-volumes: &wp-volumes
   - wp_data:/var/www/html
@@ -80,9 +88,34 @@ services:
     volumes: *wp-volumes
     entrypoint: ["sh", "-c", "while :; do wp core is-installed 2>/dev/null && wp cron event run --due-now --quiet 2>/dev/null; sleep 60; done"]
 
+  # One-shot: self-signed certificate so Mailpit can offer STARTTLS (the Mailpit image has no openssl).
+  mailpit-tls:
+    image: wordpress:${WP_CLI_IMAGE_TAG:-cli-2.12-php8.4}
+    user: "0:0"
+    volumes:
+      - mailpit_tls:/tls
+    entrypoint:
+      - sh
+      - -c
+      - >-
+        [ -s /tls/cert.pem ] || openssl req -x509 -newkey rsa:2048 -nodes -days 3650
+        -subj /CN=mailpit -addext subjectAltName=DNS:mailpit,DNS:localhost
+        -keyout /tls/key.pem -out /tls/cert.pem 2>/dev/null; chmod 644 /tls/key.pem /tls/cert.pem
+
+  # SMTP sink that behaves like Brevo: STARTTLS and authentication are mandatory.
   mailpit:
     image: axllent/mailpit:latest
     restart: unless-stopped
+    depends_on:
+      mailpit-tls:
+        condition: service_completed_successfully
+    environment:
+      MP_SMTP_TLS_CERT: /tls/cert.pem
+      MP_SMTP_TLS_KEY: /tls/key.pem
+      MP_SMTP_REQUIRE_STARTTLS: "true"
+      MP_SMTP_AUTH: "${BP_SMTP_USER:-bp-smtp}:${BP_SMTP_PASS:?Run bin/setup.sh to generate backend/.env}"
+    volumes:
+      - mailpit_tls:/tls:ro
     ports:
       - "${MAILPIT_PORT:-8025}:8025"
 
@@ -118,3 +151,4 @@ services:
 volumes:
   db_data:
   wp_data:
+  mailpit_tls:

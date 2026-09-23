@@ -39,7 +39,7 @@ final class HtmlCleaner
 
     /**
      * @param  list<string>  $frontHosts  host[:port] of the public site (links to them become relative).
-     * @param  string  $cmsOrigin  Origin of this CMS, e.g. "https://api.banosportatiles.net".
+     * @param  string  $cmsOrigin  Origin of this CMS, e.g. "https://admin.banosportatiles.net".
      * @param  (callable(string): ?string)|null  $pathMapper  Maps a CMS path ("/mi-post/") to its public URI ("/blog/mi-post/").
      */
     public function __construct(array $frontHosts, string $cmsOrigin, ?callable $pathMapper = null)

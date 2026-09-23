@@ -19,6 +19,7 @@ final class SiteNormalizer
         private readonly FieldReader $fields,
         private readonly ReferenceResolver $refs,
         private readonly UriResolver $uris,
+        private readonly CiudadNormalizer $ciudades,
     ) {}
 
     /**
@@ -150,20 +151,9 @@ final class SiteNormalizer
 
         $out = [];
         foreach ($terms as $term) {
-            if (! $term instanceof \WP_Term) {
-                continue;
+            if ($term instanceof \WP_Term) {
+                $out[] = $this->ciudades->full($term);
             }
-            $ref = 'term_'.$term->term_id;
-            $cercanos = $this->fields->get('cercanos', $ref);
-            $out[] = array_filter([
-                'slug' => $term->slug,
-                'name' => html_entity_decode($term->name, ENT_QUOTES | ENT_HTML5, 'UTF-8'),
-                'departamento' => is_string($d = $this->fields->get('departamento', $ref)) ? trim($d) : '',
-                'lat' => Arr::float(['v' => $this->fields->get('lat', $ref)], 'v'),
-                'lng' => Arr::float(['v' => $this->fields->get('lng', $ref)], 'v'),
-                'cercanos' => is_string($cercanos) ? Arr::lines($cercanos) : [],
-                'nota' => is_string($n = $this->fields->get('nota', $ref)) ? trim($n) : '',
-            ], static fn (mixed $v): bool => $v !== null);
         }
 
         return $out;

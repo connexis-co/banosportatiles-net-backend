@@ -50,6 +50,7 @@ final class LeadRepository
             'pagina' => $lead->pagina ?? '',
             'utm' => (string) wp_json_encode($lead->utm),
             'consentimiento' => current_time('mysql'),
+            'consentimiento_comercial' => $lead->consentimientoComercial ? '1' : '0',
             'ip_hash' => $context['ip_hash'],
             'user_agent' => mb_substr($context['user_agent'], 0, 255),
             'estado' => 'nuevo',
@@ -66,6 +67,40 @@ final class LeadRepository
         }
 
         return ['id' => $id, 'reference' => $reference];
+    }
+
+    /**
+     * Rebuilds a stored lead (e.g. to resend its email with `wp bp leads resend`).
+     *
+     * @return array{lead: LeadData, reference: string}|null
+     */
+    public function load(int $leadId): ?array
+    {
+        if (get_post_type($leadId) !== PostTypes::LEAD) {
+            return null;
+        }
+
+        $optional = static fn (string $key): ?string => self::meta($leadId, $key) !== '' ? self::meta($leadId, $key) : null;
+        $utm = json_decode(self::meta($leadId, 'utm'), true);
+        $cantidad = self::meta($leadId, 'cantidad');
+
+        return [
+            'lead' => new LeadData(
+                nombre: self::meta($leadId, 'nombre'),
+                telefono: self::meta($leadId, 'telefono'),
+                email: $optional('email'),
+                ciudad: $optional('ciudad'),
+                servicio: $optional('servicio'),
+                mensaje: $optional('mensaje'),
+                fechaEvento: $optional('fecha_evento'),
+                cantidad: ctype_digit($cantidad) ? (int) $cantidad : null,
+                pagina: $optional('pagina'),
+                utm: is_array($utm) ? array_map('strval', array_filter($utm, 'is_scalar')) : [],
+                consentimiento: true,
+                consentimientoComercial: self::meta($leadId, 'consentimiento_comercial') === '1',
+            ),
+            'reference' => self::meta($leadId, 'ref'),
+        ];
     }
 
     public static function meta(int $leadId, string $key): string

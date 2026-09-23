@@ -19,7 +19,9 @@ final class LeadAdmin implements Hookable
         'nombre' => 'Nombre', 'telefono' => 'Teléfono', 'email' => 'Email', 'ciudad' => 'Ciudad',
         'servicio' => 'Servicio', 'fecha_evento' => 'Fecha del evento', 'cantidad' => 'Cantidad',
         'mensaje' => 'Mensaje', 'pagina' => 'Página de origen', 'utm' => 'UTM', 'consentimiento' => 'Consentimiento (fecha)',
-        'ref' => 'Referencia', 'mail' => 'Email de aviso', 'webhook' => 'Webhook',
+        'consentimiento_comercial' => 'Acepta comunicaciones comerciales (1 = sí)',
+        'ref' => 'Referencia', 'status' => 'Estado del email', 'email_error' => 'Error del email',
+        'email_attempts' => 'Intentos de envío', 'webhook' => 'Webhook',
     ];
 
     public function register(): void
@@ -43,6 +45,7 @@ final class LeadAdmin implements Hookable
             'bp_email' => 'Email',
             'bp_service' => 'Servicio',
             'bp_status' => 'Estado',
+            'bp_email_status' => 'Aviso',
             'date' => $columns['date'] ?? 'Fecha',
         ] + $columns;
     }
@@ -54,6 +57,13 @@ final class LeadAdmin implements Hookable
             'bp_email' => LeadRepository::meta($postId, 'email'),
             'bp_service' => LeadRepository::meta($postId, 'servicio'),
             'bp_status' => LeadRepository::STATES[LeadRepository::meta($postId, 'estado')] ?? 'Nuevo',
+            'bp_email_status' => match (LeadRepository::meta($postId, 'status')) {
+                'email_sent' => 'Enviado',
+                'email_failed' => 'Falló (wp bp leads resend '.$postId.')',
+                'email_disabled' => 'Desactivado',
+                'email_skipped' => 'Sin destinatario',
+                default => '—',
+            },
             default => null,
         };
         if ($value === null) {

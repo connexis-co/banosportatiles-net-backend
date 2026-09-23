@@ -33,6 +33,7 @@ final class NodeNormalizer
         private readonly HeroNormalizer $hero,
         private readonly SectionsNormalizer $sections,
         private readonly FaqNormalizer $faqs,
+        private readonly CiudadNormalizer $ciudades,
     ) {}
 
     /**
@@ -239,8 +240,10 @@ final class NodeNormalizer
                 if ($taxonomy === 'category' && $term->term_id === (int) get_option('default_category')) {
                     continue;
                 }
-                $terms[$taxonomy][] = ['id' => $term->term_id, 'slug' => $term->slug, 'name' => self::decode($term->name)]
-                    + Arr::withoutEmpty(['uri' => $this->uris->forTerm($term)]);
+                $terms[$taxonomy][] = $taxonomy === Taxonomies::CIUDAD
+                    ? $this->ciudades->term($term)
+                    : ['id' => $term->term_id, 'slug' => $term->slug, 'name' => self::decode($term->name)]
+                        + Arr::withoutEmpty(['uri' => $this->uris->forTerm($term)]);
             }
         }
 

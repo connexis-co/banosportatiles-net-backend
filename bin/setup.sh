@@ -3,7 +3,8 @@
 # Usage: bin/setup.sh [--no-seed]
 set -euo pipefail
 
-BACKEND_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+# Physical path: Docker must mount ~/dev/…, never the ~/Documents symlink (macOS TCC).
+BACKEND_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 cd "$BACKEND_DIR"
 
 SKIP_SEED=0
@@ -52,6 +53,7 @@ ensure_secret DB_ROOT_PASSWORD password
 ensure_secret WP_ADMIN_PASSWORD password
 ensure_secret BP_LEADS_SECRET hex
 ensure_secret BP_PREVIEW_SECRET hex
+ensure_secret BP_SMTP_PASS password
 
 bp_load_env
 mkdir -p dist

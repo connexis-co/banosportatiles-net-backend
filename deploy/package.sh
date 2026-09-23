@@ -5,14 +5,14 @@
 #   export-<stamp>/db.sql.gz           DB dump with the local URL rewritten to the production CMS URL
 #   export-<stamp>/uploads.tar.gz      wp-content/uploads
 #   export-<stamp>/plugins.csv, wp-version.txt, SHA256SUMS
-# Usage: deploy/package.sh [--url=https://api.banosportatiles.net] [--no-export]
+# Usage: deploy/package.sh [--url=https://admin.banosportatiles.net] [--no-export]
 set -euo pipefail
 
-cd "$(dirname "${BASH_SOURCE[0]}")/.."
+cd "$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 # shellcheck source=../bin/lib.sh
 source bin/lib.sh
 
-TARGET_URL="https://api.banosportatiles.net"
+TARGET_URL="https://admin.banosportatiles.net"
 EXPORT=1
 for arg in "$@"; do
   case "$arg" in

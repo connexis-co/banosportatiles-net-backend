@@ -1,0 +1,23 @@
+#!/bin/bash
+# CloudPanel v2 CLI simulator (only what deploy/cloudpanel/remote.sh uses). Logs every call.
+set -euo pipefail
+cmd="${1:-}"; shift || true
+declare -A o=()
+for a in "$@"; do k="${a%%=*}"; k="${k#--}"; o[$k]="${a#*=}"; done
+state=/var/lib/clp-sim; mkdir -p "$state/templates" /etc/nginx/sites-enabled
+echo "$(date +%T) clpctl $cmd ${!o[*]}" >> "$state/calls.log"
+case "$cmd" in
+  vhost-templates:list) printf '%s\n' Generic WordPress; ls "$state/templates" ;;
+  vhost-template:add) cp "${o[file]}" "$state/templates/${o[name]}" ;;
+  site:add:php)
+    [[ -f "$state/templates/${o[vhostTemplate]}" ]] || { echo "Template ${o[vhostTemplate]} not found" >&2; exit 1; }
+    id "${o[siteUser]}" >/dev/null 2>&1 || useradd -m -s /bin/bash "${o[siteUser]}"
+    mkdir -p "/home/${o[siteUser]}/htdocs/${o[domainName]}"
+    chown -R "${o[siteUser]}:${o[siteUser]}" "/home/${o[siteUser]}"
+    sed -e "s#{{ssl_certificate}}#ssl_certificate /etc/nginx/ssl-certificates/${o[domainName]}.crt;#" \
+        -e "s#{{server_name}}#server_name ${o[domainName]};#" "$state/templates/${o[vhostTemplate]}" > "/etc/nginx/sites-enabled/${o[domainName]}.conf" ;;
+  db:add)
+    MYSQL_PWD="$CLP_SIM_DB_ROOT" mysql -h127.0.0.1 -uroot -e "CREATE DATABASE IF NOT EXISTS \`${o[databaseName]}\`; CREATE USER IF NOT EXISTS '${o[databaseUserName]}'@'%' IDENTIFIED BY '${o[databaseUserPassword]}'; GRANT ALL ON \`${o[databaseName]}\`.* TO '${o[databaseUserName]}'@'%';" ;;
+  lets-encrypt:install:certificate) echo "Let's Encrypt simulated for ${o[domainName]}" ;;
+  *) echo "clpctl sim: unsupported $cmd" >&2; exit 1 ;;
+esac

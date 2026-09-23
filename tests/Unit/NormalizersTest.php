@@ -14,7 +14,7 @@ function refs(): FakeReferenceResolver
         slugs: [7 => 'bano-portatil-estandar', 9 => 'pozo-septico-guia'],
         uris: [11 => '/alquiler-de-banos-portatiles/', 9 => '/blog/pozo-septico-guia/'],
         terms: [2 => 'medellin', 3 => 'cali'],
-        images: [8 => ['src' => 'https://api.banosportatiles.net/wp-content/uploads/a.webp', 'width' => 1200, 'height' => 630, 'alt' => 'Baño']],
+        images: [8 => ['src' => 'https://admin.banosportatiles.net/wp-content/uploads/a.webp', 'width' => 1200, 'height' => 630, 'alt' => 'Baño']],
         faqs: [5 => ['q' => '¿Cuántos baños necesito?', 'a' => 'Depende del uso.']],
     );
 }

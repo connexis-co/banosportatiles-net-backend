@@ -86,7 +86,7 @@ final class SiteSettings
             ]),
             $f->group('forms', 'Formularios', static fn (FieldBuilder $fo): array => [
                 $fo->text('turnstile_site_key', 'Cloudflare Turnstile — site key (pública)'),
-                $fo->email('leads_email', 'Email que recibe los leads', ['instructions' => 'Vacío = email de contacto o del administrador.']),
+                $fo->email('leads_email', 'Email que recibe los leads', ['instructions' => 'Vacío = contacto@banosportatiles.net. La constante BP_LEADS_EMAIL_TO (wp-config) tiene prioridad; las copias van en BP_LEADS_EMAIL_CC.']),
                 $fo->url('leads_webhook_url', 'Webhook de leads (opcional)', ['instructions' => 'n8n, Make, CRM… Recibe un POST firmado (HMAC) por cada lead.']),
             ]),
 

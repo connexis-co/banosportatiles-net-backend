@@ -3,7 +3,7 @@
 # backend/.env is kept. Usage: bin/reset.sh [--yes] [--down-only]
 set -euo pipefail
 
-BACKEND_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
+BACKEND_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd -P)"
 cd "$BACKEND_DIR"
 
 ASSUME_YES=0
@@ -24,7 +24,9 @@ fi
 # shellcheck source=lib.sh
 source bin/lib.sh
 [[ -f .env ]] && bp_load_env
-docker compose --profile cli --profile test down --volumes --remove-orphans
+# Both files so the volumes of either mount mode (bind or sync) are removed.
+export BP_SMTP_PASS="${BP_SMTP_PASS:-x}" DB_PASSWORD="${DB_PASSWORD:-x}" DB_ROOT_PASSWORD="${DB_ROOT_PASSWORD:-x}" BP_LEADS_SECRET="${BP_LEADS_SECRET:-x}" BP_PREVIEW_SECRET="${BP_PREVIEW_SECRET:-x}"
+docker compose -f docker-compose.yml -f docker-compose.sync.yml --profile cli --profile test down --volumes --remove-orphans
 rm -f tests/fixtures/hook-sink/requests.log
 
 if [[ "$DOWN_ONLY" -eq 0 ]]; then

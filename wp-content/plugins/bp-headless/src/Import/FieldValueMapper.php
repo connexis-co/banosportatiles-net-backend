@@ -184,6 +184,7 @@ final class FieldValueMapper
     {
         return [
             'departamento' => Arr::string($ciudad, 'departamento'),
+            'autoridad_ambiental' => Arr::string($ciudad, 'autoridad_ambiental'),
             'lat' => Arr::float($ciudad, 'lat') ?? '',
             'lng' => Arr::float($ciudad, 'lng') ?? '',
             'cercanos' => implode("\n", Arr::strings($ciudad, 'cercanos')),

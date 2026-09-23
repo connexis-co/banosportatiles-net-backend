@@ -1,6 +1,6 @@
 # banosportatiles.net — backend (WordPress headless)
 
-WordPress 7.x **solo como CMS/API** en `api.banosportatiles.net`. El sitio público es Astro 7 en Cloudflare
+WordPress 7.x **solo como CMS/API** en `admin.banosportatiles.net`. El sitio público es Astro 7 en Cloudflare
 (`https://banosportatiles.net`), que consume la API `bp/v1` en el build y para las previews, y envía los leads
 firmados con HMAC. Plan y contrato: [`docs/plans/2026-09-22_reestructuracion-headless.md`](../docs/plans/2026-09-22_reestructuracion-headless.md).
 
@@ -22,18 +22,19 @@ backend/
 Requisitos: Docker Desktop, `jq`, `openssl`, PHP 8.3+ y Composer (solo para las herramientas de desarrollo).
 
 ```bash
-cd backend
+cd ~/dev/banosportatiles-net/backend   # (también accesible por el symlink de ~/Documents/JP Projects/banosportatiles.net/backend)
 bin/setup.sh            # idempotente: .env con secretos aleatorios → contenedores → WP instalado → seed importado
 composer install        # Pest, Pint, PHPStan (dev)
 composer check          # pint --test + phpstan (nivel 8) + pest
-tests/smoke.sh          # 78 comprobaciones end-to-end contra el Docker levantado
+tests/smoke.sh          # 94 comprobaciones end-to-end contra el Docker levantado
+deploy/cloudpanel/sim/run.sh   # deploy a CloudPanel simulado en Docker (13 comprobaciones)
 ```
 
 | URL | Qué |
 |---|---|
 | http://localhost:8080/wp-admin/ | Admin (usuario `bp-admin`, contraseña en `backend/.env` → `WP_ADMIN_PASSWORD`) |
 | http://localhost:8080/wp-json/bp/v1/site | API |
-| http://localhost:8025 | Mailpit (avisos de leads) |
+| http://localhost:8025 | Mailpit: todos los emails (STARTTLS + AUTH obligatorios, como Brevo) |
 | http://localhost:4321 | Front Astro local (destino de la redirección 301 y de las previews) |
 
 Comandos útiles:
@@ -44,17 +45,18 @@ docker compose run --rm wpcli wp bp import-seed /opt/bp/seed/bundle.json --asset
 docker compose run --rm wpcli wp bp deploy         # dispara el deploy hook ahora
 docker compose run --rm wpcli wp bp cache flush    # vacía la caché de la API
 docker compose run --rm wpcli wp bp preview-url 12 # URL de preview firmada (15 min)
+docker compose run --rm wpcli wp bp leads resend 42 [--failed]   # reenvía el email de leads (p. ej. email_failed)
 bin/sync.sh                                        # en modo sync: copia el código al contenedor
 bin/reset.sh --yes                                 # borra BD + uploads locales y vuelve a montar todo
-deploy/package.sh                                  # zips del plugin/tema + export de BD/uploads (URL → api.banosportatiles.net)
+deploy/package.sh                                  # zips del plugin/tema + export de BD/uploads (URL → admin.banosportatiles.net)
+deploy/cloudpanel/deploy.sh --dry-run              # deploy a producción (connexis-prod): ver deploy/README.md
 ```
 
 Para importar el seed real del frontend: `BP_SEED_DIR=../frontend/<carpeta-con-bundle.json-y-assets> bin/setup.sh`.
 
-> **macOS y `~/Documents`.** Docker Desktop no tiene permiso para montar esta carpeta (privacidad TCC), así que `setup.sh`
-> lo detecta y activa el **modo sync**: el código va en volúmenes con nombre y `bin/sync.sh` lo actualiza. Para usar
-> montajes en vivo: *Ajustes del Sistema → Privacidad y seguridad → Archivos y carpetas → Docker → Carpeta Documentos*, y
-> vuelve a correr `bin/setup.sh`.
+> **Montajes y macOS.** El código vive en `~/dev/banosportatiles-net/backend` y los scripts resuelven siempre la ruta física
+> (`pwd -P`), así que Docker monta el plugin y el tema **en vivo**. Si el repo se clona dentro de `~/Documents`, Docker Desktop
+> no puede montarlo (privacidad TCC): `setup.sh` lo detecta y activa el **modo sync** (volúmenes con nombre + `bin/sync.sh`).
 >
 > **wordpress.org y `localhost:8080`.** La API y las descargas de wordpress.org responden **434** a las peticiones cuyo
 > User-Agent es `WordPress/x; http://localhost:8080`. Por eso `provision.sh` descarga los zips públicos (plugins y
@@ -91,11 +93,15 @@ una raíz de composición (`Plugin::boot()`) que registra módulos `Hookable`.
 | `BP_DEPLOY_HOOK_URL` | Deploy hook de Workers Builds | opción «Ajustes → Despliegue» |
 | `BP_CORS_ORIGINS` | Orígenes CORS extra, separados por comas (p. ej. `*.workers.dev`) | — |
 | `BP_LEADS_WEBHOOK_URL` | Webhook opcional por lead | opción «Ajustes → Formularios» |
-| `BP_SMTP_HOST/PORT/USER/PASS/SECURE/FROM` | Transporte SMTP de `wp_mail` | — (local: Mailpit) |
+| `BP_LEADS_EMAIL` | `false` = guarda los leads sin enviar email | `true` |
+| `BP_LEADS_EMAIL_TO` | Destinatarios del email de cada lead (coma) | opción «Ajustes → Formularios» → `contacto@banosportatiles.net` |
+| `BP_LEADS_EMAIL_CC` | Copias (coma; `none` las desactiva) | `connexis.co@gmail.com` |
+| `BP_SMTP_HOST`, `BP_SMTP_PORT`, `BP_SMTP_USER`, `BP_SMTP_PASS`, `BP_SMTP_FROM`, `BP_SMTP_FROM_NAME` | SMTP de **todo** `wp_mail` vía `phpmailer_init` (sin plugin). Producción: Brevo `smtp-relay.brevo.com:587` | local: Mailpit |
+| `BP_SMTP_SECURE` | `tls` (STARTTLS), `ssl` o `none`; vacío = según el puerto (587 → STARTTLS, 465 → SSL) | — |
 
 ## API `bp/v1`
 
-Base: `https://api.banosportatiles.net/wp-json/bp/v1` (local: `http://localhost:8080/wp-json/bp/v1`).
+Base: `https://admin.banosportatiles.net/wp-json/bp/v1` (local: `http://localhost:8080/wp-json/bp/v1`).
 Los GET públicos envían `Cache-Control: public, max-age=30` + `ETag` (y responden **304** a `If-None-Match`). Las previews y
 los leads envían `private, no-store`. Todo el host lleva `X-Robots-Tag: noindex, nofollow`.
 
@@ -129,7 +135,7 @@ camelCase. Las imágenes son `{src, width, height, alt}` con `src` absoluto al C
     "header": [{ "label": "Alquiler", "href": "/alquiler-de-banos-portatiles/", "children": [{ "label": "Medellín", "href": "/alquiler-de-banos-portatiles/medellin/" }] }],
     "footer": [{ "title": "Servicios", "links": [{ "label": "Alquiler de baños portátiles", "href": "/alquiler-de-banos-portatiles/" }] }]
   },
-  "ciudades": [{ "slug": "medellin", "name": "Medellín", "departamento": "Antioquia", "lat": 6.2442, "lng": -75.5812, "cercanos": ["Envigado", "Bello"], "nota": "…" }],
+  "ciudades": [{ "slug": "medellin", "name": "Medellín", "departamento": "Antioquia", "autoridad_ambiental": "Área Metropolitana del Valle de Aburrá (AMVA)", "lat": 6.2442, "lng": -75.5812, "cercanos": ["Envigado", "Bello"], "nota": "…" }],
   "categorias": [{ "slug": "pozos-septicos", "name": "Pozos y tanques sépticos", "description": "…", "uri": "/blog/tema/pozos-septicos/", "count": 1, "pillar": "pozo-septico-guia", "pillarUri": "/blog/pozo-septico-guia/" }]
 }
 ```
@@ -154,7 +160,7 @@ camelCase. Las imágenes son `{src, width, height, alt}` con `src` absoluto al C
   "hero": {
     "eyebrow": "Medellín y Valle de Aburrá", "h1": "Alquiler de baños portátiles en Medellín", "lead": "…",
     "bullets": ["Accesos en ladera", "Eventos y obras"],
-    "image": { "src": "https://api.banosportatiles.net/wp-content/uploads/2026/09/placeholder-hero.webp", "width": 1200, "height": 630, "alt": "…" },
+    "image": { "src": "https://admin.banosportatiles.net/wp-content/uploads/2026/09/placeholder-hero.webp", "width": 1200, "height": 630, "alt": "…" },
     "cta_primario": { "label": "Cotizar en Medellín", "href": "/cotizar/" },
     "cta_secundario": { "label": "WhatsApp", "href": "whatsapp" },
     "mostrar_formulario": true
@@ -172,7 +178,7 @@ camelCase. Las imágenes son `{src, width, height, alt}` con `src` absoluto al C
   ],
   "parent": { "id": 11, "uri": "/alquiler-de-banos-portatiles/", "title": "Alquiler de baños portátiles" },
   "children": [],
-  "terms": { "ciudad": [{ "id": 2, "slug": "medellin", "name": "Medellín" }] },
+  "terms": { "ciudad": [{ "id": 2, "slug": "medellin", "name": "Medellín", "autoridad_ambiental": "Área Metropolitana del Valle de Aburrá (AMVA)" }] },
   "image": { "src": "…/placeholder-hero.webp", "width": 1200, "height": 630, "alt": "…" },
   "published": "2026-09-22T21:41:28-05:00", "modified": "2026-09-22T21:41:28-05:00"
 }
@@ -200,17 +206,19 @@ Ventana: ±5 min. Cada firma se acepta **una sola vez** (anti-replay).
   "ciudad": "medellin", "servicio": "Alquiler para evento", "mensaje": "4 baños para 300 personas",
   "fecha_evento": "2026-10-15", "cantidad": 4, "pagina": "/alquiler-de-banos-portatiles/medellin/",
   "utm": { "source": "google", "medium": "cpc", "campaign": "medellin", "gclid": "…" },
-  "consentimiento": true
+  "consentimiento": true,
+  "consentimiento_comercial": false
 }
 ```
 
 Obligatorios: `nombre` (2–120), `telefono` (7–15 dígitos, `+` opcional) y `consentimiento: true` (Ley 1581 de 2012).
 Opcionales: `email`, `ciudad` (≤ 80; si coincide con un slug se asigna el término), `servicio` (≤ 120), `mensaje` (≤ 2000),
-`fecha_evento` (AAAA-MM-DD), `cantidad` (1–10 000), `pagina` (ruta relativa) y `utm` (`source, medium, campaign, term, content, gclid, gbraid, wbraid, fbclid`).
+`fecha_evento` (AAAA-MM-DD), `cantidad` (1–10 000), `pagina` (ruta relativa), `utm` (`source, medium, campaign, term, content, gclid, gbraid, wbraid, fbclid`)
+y `consentimiento_comercial` (acepta comunicaciones comerciales; opcional, por defecto `false`).
 
 | Respuesta | Cuándo |
 |---|---|
-| `201 {"ok": true, "reference": "uuid"}` | lead creado + email (`wp_mail`) + webhook programado |
+| `201 {"ok": true, "reference": "uuid"}` | lead guardado + email (aunque el email falle) + webhook programado |
 | `401 bp_invalid_signature` / `bp_replayed_request` | sin firma, firma inválida, fuera de ventana o reenvío |
 | `422 bp_invalid_lead` + `data.errors {campo: mensaje}` | validación (mensajes en español) |
 | `429 bp_rate_limited` + `Retry-After` | > 5 leads / 10 min por IP del visitante, o > 20 firmas fallidas / 10 min por IP de red |
@@ -231,6 +239,14 @@ await fetch(`${env.WP_API_URL}/leads`, { method: 'POST', body, headers: {
 ```
 
 El webhook opcional recibe `{"event": "lead.created", "reference", "created_at", "lead": {…}, "admin_url"}` firmado con el mismo esquema.
+
+**Email de cada lead** (lo envía WordPress, no el Worker, porque Brevo solo autoriza la IP del servidor):
+- A `BP_LEADS_EMAIL_TO` (`contacto@banosportatiles.net`) con copia a `BP_LEADS_EMAIL_CC` (`connexis.co@gmail.com`).
+- Asunto `Nueva cotización: <servicio> en <ciudad> — <nombre>`.
+- Cuerpo HTML con alternativa de texto: todos los campos, consentimientos, URL de origen, UTM, fecha en hora de Colombia, referencia y enlace al CMS.
+- `Reply-To` con el email del prospecto, si lo dejó.
+
+Si el envío falla, el lead queda guardado con `_bp_lead_status=email_failed`, el error en `_bp_lead_email_error` (también en el log de PHP) y el contador en `_bp_lead_email_attempts`. Se reintenta con `wp bp leads resend <id>` o `wp bp leads resend --failed`. Otros estados: `email_sent`, `email_disabled` (`BP_LEADS_EMAIL=false`) y `email_skipped` (sin destinatario). El listado de leads del admin muestra el estado en la columna «Aviso».
 
 ### Previews
 
@@ -259,12 +275,14 @@ sitio» en la barra superior y un widget del dashboard con el último disparo, s
 
 | Herramienta | Resultado |
 |---|---|
-| `vendor/bin/pest` | 75 tests / 390 aserciones (HtmlCleaner, Slugger, UriResolver, HMAC, PreviewToken, validación y rate limit de leads, normalizadores, round-trip seed → SCF → API, grupos SCF, bundle, HTTP/CORS) |
+| `vendor/bin/pest` | 109 tests / 459 aserciones (HtmlCleaner, Slugger, UriResolver, HMAC, PreviewToken, validación, email y rate limit de leads, normalizadores, ciudades, round-trip seed → SCF → API, grupos SCF, bundle, HTTP/CORS, SMTP y flags de configuración) |
 | `vendor/bin/pint --test` | preset laravel + `declare_strict_types` |
 | `vendor/bin/phpstan` | **nivel 8**, `phpVersion` 8.3, con stubs de WordPress, SCF/ACF y WP-CLI, sin baseline ni ignores |
-| `tests/smoke.sh` | 78 comprobaciones end-to-end (endpoints, forma del JSON, ETag/304, invalidación, leads 201/401/422/429, replay, Mailpit, webhook firmado, 301 del front, robots, previews, hardening, CORS, deploy hook) |
+| `tests/smoke.sh` | 94 comprobaciones end-to-end (endpoints, forma del JSON, ETag/304, invalidación, leads 201/401/422/429, replay, email del lead con To/Cc/Reply-To/HTML, `BP_LEADS_EMAIL=false`, fallo SMTP → `email_failed` → `leads resend`, SMTP con STARTTLS + AUTH obligatorios, webhook firmado, 301 del front, robots, previews, hardening, CORS, deploy hook) |
+| `deploy/cloudpanel/sim/run.sh` | 13 comprobaciones del deploy real contra un CloudPanel simulado (pasada nueva + idempotente) |
 
 ## Despliegue
 
-Ver [`deploy/README.md`](deploy/README.md): runbook del VPS Hostinger (CloudPanel o Docker), constantes de
-`wp-config.php`, SSL Full (strict) detrás de Cloudflare, cron real, backups, verificación y cutover.
+Producción: `https://admin.banosportatiles.net` en **connexis-prod** (Hetzner + CloudPanel), con
+`deploy/cloudpanel/deploy.sh` (idempotente, `--dry-run`). Ver [`deploy/README.md`](deploy/README.md): DNS y proxy de Cloudflare,
+IP autorizada en Brevo, secretos en `backend/.env.deploy`, vhost, cron real, verificación, backups y rollback.

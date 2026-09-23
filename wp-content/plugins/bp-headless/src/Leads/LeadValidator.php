@@ -6,7 +6,8 @@ namespace BanosPortatiles\Headless\Leads;
 
 /**
  * Validates and sanitizes the POST /bp/v1/leads payload (pure PHP, no WordPress calls).
- * Required: nombre, telefono, consentimiento=true. Unknown keys are ignored.
+ * Required: nombre, telefono, consentimiento=true (data processing, Ley 1581 de 2012).
+ * Optional: consentimiento_comercial (marketing communications). Unknown keys are ignored.
  */
 final class LeadValidator
 {
@@ -89,6 +90,7 @@ final class LeadValidator
             pagina: $pagina !== '' ? $pagina : null,
             utm: self::utm($input['utm'] ?? null),
             consentimiento: true,
+            consentimientoComercial: self::isTrue($input['consentimiento_comercial'] ?? null),
         ), []);
     }
 

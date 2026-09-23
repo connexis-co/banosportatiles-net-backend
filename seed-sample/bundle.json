@@ -90,6 +90,7 @@
       "slug": "medellin",
       "name": "Medellín",
       "departamento": "Antioquia",
+      "autoridad_ambiental": "Área Metropolitana del Valle de Aburrá (AMVA)",
       "lat": 6.2442,
       "lng": -75.5812,
       "cercanos": [
@@ -105,6 +106,7 @@
       "slug": "cali",
       "name": "Cali",
       "departamento": "Valle del Cauca",
+      "autoridad_ambiental": "Departamento Administrativo de Gestión del Medio Ambiente (DAGMA)",
       "lat": 3.4516,
       "lng": -76.532,
       "cercanos": [

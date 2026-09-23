@@ -1,0 +1,11 @@
+#!/bin/bash
+# Fake ssh for deploy tests: runs the remote command in the "bp-sim" container (cwd /root, like an SSH login).
+while [[ $# -gt 0 ]]; do
+  case "$1" in
+    -o|-p|-l|-i) shift 2 ;;
+    -*) shift ;;
+    *) break ;;
+  esac
+done
+shift # host
+exec docker exec -i -w /root -e HOME=/root bp-sim bash -c "$*"

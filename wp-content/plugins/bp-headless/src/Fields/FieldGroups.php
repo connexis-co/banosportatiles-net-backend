@@ -225,6 +225,7 @@ final class FieldGroups
 
         return self::group('ciudad', 'Datos de la ciudad', [[['param' => 'taxonomy', 'operator' => '==', 'value' => Taxonomies::CIUDAD]]], [
             $f->text('departamento', 'Departamento'),
+            $f->text('autoridad_ambiental', 'Autoridad ambiental', ['instructions' => 'CAR o autoridad ambiental urbana que regula vertimientos y residuos en la ciudad (p. ej. AMVA, DAGMA, CAR).']),
             $f->number('lat', 'Latitud', ['step' => 'any']),
             $f->number('lng', 'Longitud', ['step' => 'any']),
             $f->textarea('cercanos', 'Municipios cercanos', ['instructions' => 'Uno por línea.']),
