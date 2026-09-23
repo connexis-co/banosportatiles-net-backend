@@ -8,7 +8,10 @@ state=/var/lib/clp-sim; mkdir -p "$state/templates" /etc/nginx/sites-enabled
 echo "$(date +%T) clpctl $cmd ${!o[*]}" >> "$state/calls.log"
 case "$cmd" in
   vhost-templates:list) printf '%s\n' Generic WordPress; ls "$state/templates" ;;
-  vhost-template:add) cp "${o[file]}" "$state/templates/${o[name]}" ;;
+  vhost-template:add)
+    # Like the real clpctl: --file must be a URL.
+    [[ "${o[file]}" =~ ^https?:// ]] || { echo "--file must be a URL" >&2; exit 1; }
+    curl -fsS "${o[file]}" -o "$state/templates/${o[name]}" ;;
   site:add:php)
     [[ -f "$state/templates/${o[vhostTemplate]}" ]] || { echo "Template ${o[vhostTemplate]} not found" >&2; exit 1; }
     id "${o[siteUser]}" >/dev/null 2>&1 || useradd -m -s /bin/bash "${o[siteUser]}"

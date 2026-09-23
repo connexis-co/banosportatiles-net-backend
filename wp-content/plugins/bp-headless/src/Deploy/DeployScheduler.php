@@ -36,6 +36,8 @@ final class DeployScheduler implements Hookable
         add_action(ContentChangeListener::ACTION, [$this, 'markDirty']);
         add_action('shutdown', [$this, 'flush']);
         add_action(self::HOOK, [$this, 'run']);
+        // Public API for other plugins: apply_filters('bp_headless/request_deploy', false, $reason) → true when scheduled.
+        add_filter('bp_headless/request_deploy', fn (mixed $scheduled, mixed $reason = ''): bool => $this->schedule(is_string($reason) && $reason !== '' ? $reason : 'solicitud externa') || $scheduled === true, 10, 2);
     }
 
     public function suspend(bool $suspended = true): void

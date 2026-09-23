@@ -42,6 +42,7 @@ bp_push_dir() {
 bp_sync() {
   bp_is_sync_mode || return 0
   bp_push_dir wp-content/plugins/bp-headless /var/www/html/wp-content/plugins/bp-headless
+  bp_push_dir wp-content/plugins/bp-sitio-en-venta /var/www/html/wp-content/plugins/bp-sitio-en-venta
   bp_push_dir wp-content/themes/bp-headless-theme /var/www/html/wp-content/themes/bp-headless-theme
   bp_push_dir bin /opt/bp/bin
   bp_push_dir "${BP_SEED_DIR:-./seed-sample}" /opt/bp/seed

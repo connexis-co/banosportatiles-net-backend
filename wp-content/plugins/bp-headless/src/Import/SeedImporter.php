@@ -208,6 +208,7 @@ final class SeedImporter implements SeedLookup
         }
 
         $this->writeFields(new FieldBuilder('site'), $this->mapper->site($site), Config::OPTIONS_ID);
+        $this->importSaleBanner(Arr::array($site, 'sale_banner'));
         $name = Arr::string(Arr::array($site, 'brand'), 'name');
         if ($name !== '') {
             update_option('blogname', $name);
@@ -217,6 +218,28 @@ final class SeedImporter implements SeedLookup
             update_option('blogdescription', $tagline);
         }
         update_option('bp_headless_seed_site_hash', $hash, false);
+    }
+
+    /**
+     * site.sale_banner → option of the bp-sitio-en-venta plugin (the single source for /site → sale_banner).
+     *
+     * @param  array<array-key, mixed>  $banner
+     */
+    private function importSaleBanner(array $banner): void
+    {
+        if ($banner === []) {
+            return;
+        }
+        $result = apply_filters('bp_sitio_en_venta/import', null, $banner);
+        if (! is_array($result)) {
+            $this->report->warn('site.sale_banner omitido: activa el plugin «Sitio en venta» (bp-sitio-en-venta).');
+
+            return;
+        }
+        foreach ([...Arr::array($result, 'errors'), ...Arr::array($result, 'warnings')] as $field => $message) {
+            $this->report->warn('sale_banner.'.$field.': '.(is_scalar($message) ? (string) $message : ''));
+        }
+        $this->report->count('aviso de venta', Arr::array($result, 'errors') === [] ? 'updated' : 'error');
     }
 
     /** @param list<array<array-key, mixed>> $items */

@@ -27,8 +27,10 @@ VERSION="$(sed -n 's/^ \* Version: *//p' wp-content/plugins/bp-headless/bp-headl
 mkdir -p dist
 
 bp_log "Plugin y tema v${VERSION}"
-rm -f "dist/bp-headless-${VERSION}.zip" "dist/bp-headless-theme-${VERSION}.zip"
+rm -f "dist/bp-headless-${VERSION}.zip" "dist/bp-headless-theme-${VERSION}.zip" dist/bp-sitio-en-venta-*.zip
 (cd wp-content/plugins && COPYFILE_DISABLE=1 zip -rqX "../../dist/bp-headless-${VERSION}.zip" bp-headless -x '*.DS_Store')
+VENTA_VERSION="$(sed -n 's/^ \* Version: *//p' wp-content/plugins/bp-sitio-en-venta/bp-sitio-en-venta.php | head -1 | tr -d '[:space:]')"
+(cd wp-content/plugins && COPYFILE_DISABLE=1 zip -rqX "../../dist/bp-sitio-en-venta-${VENTA_VERSION}.zip" bp-sitio-en-venta -x '*.DS_Store')
 (cd wp-content/themes && COPYFILE_DISABLE=1 zip -rqX "../../dist/bp-headless-theme-${VERSION}.zip" bp-headless-theme -x '*.DS_Store')
 
 if [[ "$EXPORT" -eq 1 ]]; then
@@ -52,5 +54,5 @@ if [[ "$EXPORT" -eq 1 ]]; then
   bp_log "Export listo: backend/dist/export-${STAMP}/"
 fi
 
-(cd dist && shasum -a 256 "bp-headless-${VERSION}.zip" "bp-headless-theme-${VERSION}.zip")
+(cd dist && shasum -a 256 "bp-headless-${VERSION}.zip" "bp-headless-theme-${VERSION}.zip" "bp-sitio-en-venta-${VENTA_VERSION}.zip")
 bp_log "Artefactos en backend/dist/ (ver deploy/README.md para el runbook)"

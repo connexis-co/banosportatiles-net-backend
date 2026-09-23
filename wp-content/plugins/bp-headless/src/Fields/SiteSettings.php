@@ -20,8 +20,6 @@ final class SiteSettings
         'youtube' => 'YouTube', 'linkedin' => 'LinkedIn', 'x' => 'X',
     ];
 
-    public const BANNER_VARIANTS = ['dark' => 'Oscuro', 'light' => 'Claro', 'accent' => 'Acento'];
-
     /**
      * @return array<string, mixed>
      */
@@ -88,15 +86,6 @@ final class SiteSettings
                 $fo->text('turnstile_site_key', 'Cloudflare Turnstile — site key (pública)'),
                 $fo->email('leads_email', 'Email que recibe los leads', ['instructions' => 'Vacío = contacto@banosportatiles.net. La constante BP_LEADS_EMAIL_TO (wp-config) tiene prioridad; las copias van en BP_LEADS_EMAIL_CC.']),
                 $fo->url('leads_webhook_url', 'Webhook de leads (opcional)', ['instructions' => 'n8n, Make, CRM… Recibe un POST firmado (HMAC) por cada lead.']),
-            ]),
-
-            $f->tab('tab_banner', 'Banner de venta'),
-            $f->group('sale_banner', 'Banner «sitio en venta»', static fn (FieldBuilder $s): array => [
-                $s->trueFalse('enabled', 'Activo'),
-                $s->text('message', 'Mensaje'),
-                $s->text('cta_label', 'Texto del botón'),
-                $s->text('cta_href', 'Enlace del botón', ['default_value' => '/sitio-en-venta/']),
-                $s->select('variant', 'Variante', self::BANNER_VARIANTS, ['default_value' => 'dark']),
             ]),
 
             $f->tab('tab_menus', 'Menús'),

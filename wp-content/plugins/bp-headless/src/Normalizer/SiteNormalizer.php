@@ -32,11 +32,10 @@ final class SiteNormalizer
         $legal = $this->option('legal');
         $analytics = $this->option('analytics');
         $forms = $this->option('forms');
-        $banner = $this->option('sale_banner');
         $menus = $this->option('menus');
         $logoId = Arr::ids($brand['logo'] ?? null)[0] ?? 0;
 
-        return [
+        $site = [
             'brand' => [
                 'name' => Arr::string($brand, 'name') ?: (string) get_bloginfo('name'),
                 'tagline' => Arr::string($brand, 'tagline'),
@@ -46,13 +45,6 @@ final class SiteNormalizer
             'legal' => self::pick($legal, ['responsable', 'razon_social', 'nit', 'direccion', 'ciudad', 'email_datos']),
             'analytics' => self::pick($analytics, ['ga4', 'gtm']),
             'forms' => self::pick($forms, ['turnstile_site_key']),
-            'sale_banner' => [
-                'enabled' => Arr::bool($banner, 'enabled'),
-                'message' => Arr::string($banner, 'message'),
-                'cta_label' => Arr::string($banner, 'cta_label'),
-                'cta_href' => Arr::string($banner, 'cta_href'),
-                'variant' => Arr::string($banner, 'variant') ?: 'dark',
-            ],
             'menus' => [
                 'header' => self::headerMenu(Arr::rows($menus, 'header')),
                 'footer' => self::footerMenu(Arr::rows($menus, 'footer')),
@@ -60,6 +52,14 @@ final class SiteNormalizer
             'ciudades' => $this->ciudades(),
             'categorias' => $this->categorias(),
         ];
+
+        // Single source of truth: the «Sitio en venta» plugin (bp-sitio-en-venta). Omitted when it is not active.
+        $banner = apply_filters('bp_headless/sale_banner', null);
+        if (is_array($banner)) {
+            $site = array_slice($site, 0, 7, true) + ['sale_banner' => $banner] + array_slice($site, 7, null, true);
+        }
+
+        return $site;
     }
 
     /**

@@ -9,7 +9,8 @@
     "autoload-dev": {
         "psr-4": {
             "BanosPortatiles\\Headless\\": "wp-content/plugins/bp-headless/src/",
-            "BanosPortatiles\\Headless\\Tests\\": "tests/"
+            "BanosPortatiles\\Headless\\Tests\\": "tests/",
+            "BanosPortatiles\\SitioEnVenta\\": "wp-content/plugins/bp-sitio-en-venta/src/"
         }
     },
     "scripts": {

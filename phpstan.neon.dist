@@ -6,6 +6,7 @@ parameters:
     phpVersion: 80300
     paths:
         - wp-content/plugins/bp-headless
+        - wp-content/plugins/bp-sitio-en-venta
         - wp-content/themes/bp-headless-theme
     scanFiles:
         - vendor/php-stubs/acf-pro-stubs/acf-pro-stubs.php

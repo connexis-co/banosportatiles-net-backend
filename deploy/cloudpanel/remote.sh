@@ -40,7 +40,13 @@ main() {
   if grep -Fq -- "$VHOST_TEMPLATE" <<<"$templates"; then
     ok "ya existe"
   else
-    clpctl vhost-template:add --name="$VHOST_TEMPLATE" --file="$STAGE_DIR/bp-headless-wordpress.tpl"
+    # clpctl solo acepta una URL en --file: se sirve la plantilla un instante por HTTP en 127.0.0.1.
+    tpl_port=18999
+    (cd "$STAGE_DIR" && python3 -m http.server "$tpl_port" --bind 127.0.0.1 >/dev/null 2>&1) &
+    tpl_pid=$!
+    for _ in 1 2 3 4 5 6 7 8 9 10; do curl -fsS -o /dev/null "http://127.0.0.1:$tpl_port/bp-headless-wordpress.tpl" && break; sleep 0.5; done
+    clpctl vhost-template:add --name="$VHOST_TEMPLATE" --file="http://127.0.0.1:$tpl_port/bp-headless-wordpress.tpl" || { kill "$tpl_pid" 2>/dev/null; die "No se pudo registrar la plantilla de vhost."; }
+    kill "$tpl_pid" 2>/dev/null || true
     ok "creada"
   fi
 
@@ -191,7 +197,7 @@ PHP
   fi
 
   # ---------------------------------------------------------------------------------------------
-  log "8/12 Tema, plugins de wordpress.org y bp-headless (rsync)"
+  log "8/12 Tema, plugins de wordpress.org, bp-headless y bp-sitio-en-venta (rsync)"
   sync_dir() {
     if command -v rsync >/dev/null; then
       rsync -a --delete "$1/" "$2/"
@@ -203,6 +209,7 @@ PHP
   }
   sync_dir "$STAGE_DIR/bp-headless-theme" "$DOCROOT/wp-content/themes/bp-headless-theme"
   sync_dir "$STAGE_DIR/bp-headless" "$DOCROOT/wp-content/plugins/bp-headless"
+  sync_dir "$STAGE_DIR/bp-sitio-en-venta" "$DOCROOT/wp-content/plugins/bp-sitio-en-venta"
   for plugin in "${PLUGINS[@]}"; do
     wp plugin is-installed "$plugin" || retry 3 wp plugin install "$plugin" --quiet
   done
@@ -212,9 +219,9 @@ PHP
   done
   wp theme activate bp-headless-theme --quiet
   for theme in $(wp theme list --status=inactive --field=name); do wp theme delete "$theme" --quiet; done
-  wp plugin activate bp-headless --quiet
+  wp plugin activate bp-headless bp-sitio-en-venta --quiet
   wp redirection database install >/dev/null 2>&1 || true
-  ok "bp-headless $(wp plugin get bp-headless --field=version) activo"
+  ok "bp-headless $(wp plugin get bp-headless --field=version) y bp-sitio-en-venta $(wp plugin get bp-sitio-en-venta --field=version) activos"
 
   # ---------------------------------------------------------------------------------------------
   log "9/12 Ajustes: idioma, zona horaria, permalinks, noindex, comentarios"

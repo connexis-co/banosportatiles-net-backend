@@ -10,7 +10,8 @@ backend/
 ├── docker-compose.sync.yml     modo "sync" automático cuando Docker no puede montar ~/Documents (TCC de macOS)
 ├── bin/                        setup.sh · reset.sh · sync.sh · provision.sh (dentro del contenedor) · lib.sh
 ├── wp-content/
-│   ├── plugins/bp-headless/    el plugin (PSR-4 propio, sin Composer en runtime)
+│   ├── plugins/bp-headless/    el plugin del CMS headless (PSR-4 propio, sin Composer en runtime)
+│   ├── plugins/bp-sitio-en-venta/  aviso «sitio en venta / alquiler» (independiente y portable)
 │   └── themes/bp-headless-theme/  tema mínimo que nunca se renderiza
 ├── seed-sample/                bundle.json de ejemplo + assets/ (placeholder)
 ├── tests/                      Pest (Unit + Brain Monkey) · smoke.sh (end-to-end con curl + jq)
@@ -26,8 +27,8 @@ cd ~/dev/banosportatiles-net/backend   # (también accesible por el symlink de ~
 bin/setup.sh            # idempotente: .env con secretos aleatorios → contenedores → WP instalado → seed importado
 composer install        # Pest, Pint, PHPStan (dev)
 composer check          # pint --test + phpstan (nivel 8) + pest
-tests/smoke.sh          # 94 comprobaciones end-to-end contra el Docker levantado
-deploy/cloudpanel/sim/run.sh   # deploy a CloudPanel simulado en Docker (13 comprobaciones)
+tests/smoke.sh          # 110 comprobaciones end-to-end contra el Docker levantado
+deploy/cloudpanel/sim/run.sh   # deploy a CloudPanel simulado en Docker (14 comprobaciones)
 ```
 
 | URL | Qué |
@@ -99,6 +100,44 @@ una raíz de composición (`Plugin::boot()`) que registra módulos `Hookable`.
 | `BP_SMTP_HOST`, `BP_SMTP_PORT`, `BP_SMTP_USER`, `BP_SMTP_PASS`, `BP_SMTP_FROM`, `BP_SMTP_FROM_NAME` | SMTP de **todo** `wp_mail` vía `phpmailer_init` (sin plugin). Producción: Brevo `smtp-relay.brevo.com:587` | local: Mailpit |
 | `BP_SMTP_SECURE` | `tls` (STARTTLS), `ssl` o `none`; vacío = según el puerto (587 → STARTTLS, 465 → SSL) | — |
 
+## Plugin `bp-sitio-en-venta` (aviso de venta o alquiler)
+
+Plugin **independiente** (no requiere bp-headless ni SCF; el sitio `.co` también puede usarlo). Namespace
+`BanosPortatiles\SitioEnVenta`, PHP 8.3 strict, JS vanilla en el admin.
+
+**Admin → «Sitio en venta»** (icono megáfono, `manage_options`):
+- **Tarjetas:** estado y modo (`venta`, `alquiler` o `venta_o_alquiler`; cambia los textos sugeridos que no hayas personalizado), mensaje con contadores, WhatsApp, botón secundario, colores, ubicaciones y comportamiento.
+- **WhatsApp:** número E.164 validado en vivo (`300 123 4567` → `+573001234567`) y mensaje con `{sitio}` y `{url}`. Es el único número de WhatsApp del sitio.
+- **Colores:** selector de color de WordPress con advertencia WCAG AA en vivo (4,5:1 textos, 3:1 botón sobre fondo).
+- **Vista previa en vivo** de la barra superior y de la tarjeta lateral.
+- **«Guardar cambios»** o **«Guardar y publicar en el sitio»** (pide un rebuild a bp-headless si está activo; si no, solo guarda).
+
+**Opción única** `bp_sitio_en_venta`, saneada y validada (los valores inválidos se rechazan con un mensaje por campo):
+
+| Campo | Tipo / regla |
+|---|---|
+| `enabled`, `show_whatsapp`, `show_secondary`, `dismissible` | bool (`show_whatsapp` se apaga si no hay número) |
+| `modo` | `venta` \| `alquiler` \| `venta_o_alquiler` |
+| `headline` (≤ 90), `message` (≤ 220), `cta_whatsapp_label`, `secondary_label` (≤ 40) | texto plano; vacío = texto por defecto del modo |
+| `whatsapp_number` | E.164 (`+57 3XX XXX XXXX`) |
+| `whatsapp_message` (≤ 500) | con `{sitio}` y `{url}` |
+| `secondary_url` | ruta del sitio (`/sitio-en-venta/`) o URL `https://` |
+| `colors` | `{bg, text, accent, accent_text}` hex `#rrggbb` |
+| `placements` | subconjunto de `top_bar`, `bottom_bar`, `home_after_hero`, `sidebar_card`, `footer_block` |
+| `dismiss_days` | 1–30 |
+| `exclude_paths` | lista de rutas (`/cotizar/` exacta, `/blog/*` sección); default `/cotizar/` |
+
+**API:** `GET /wp-json/bp-venta/v1/config[?path=/ruta/]` (pública; transient invalidado al guardar, `Cache-Control: public, max-age=60`, ETag = `version` y 304). Devuelve la opción más `version`, un hash que cambia con cada edición y sirve para volver a mostrar avisos cerrados. Con `?path=` añade `visible` (activo y no excluido). `GET /bp/v1/site → sale_banner` es **el mismo objeto** (fuente única); el `sale_banner` de SCF desapareció.
+
+**Integración solo por hooks** (cada plugin funciona sin el otro):
+
+| Hook | Quién lo usa |
+|---|---|
+| filtro `bp_headless/sale_banner` | bp-headless lo pide para `/site` (se omite si el plugin no está activo) |
+| acción `bp_sitio_en_venta/updated` | se dispara en cada cambio de la opción; bp-headless vacía su caché (sin deploy) |
+| filtro `bp_headless/request_deploy` | «Guardar y publicar» pide el rebuild (debounce de 60 s) |
+| filtro `bp_sitio_en_venta/import` | `wp bp import-seed` guarda `site.sale_banner` aquí |
+
 ## API `bp/v1`
 
 Base: `https://admin.banosportatiles.net/wp-json/bp/v1` (local: `http://localhost:8080/wp-json/bp/v1`).
@@ -130,7 +169,7 @@ camelCase. Las imágenes son `{src, width, height, alt}` con `src` absoluto al C
   "legal": { "responsable": "", "razon_social": "", "nit": "", "direccion": "", "ciudad": "", "email_datos": "" },
   "analytics": { "ga4": "", "gtm": "" },
   "forms": { "turnstile_site_key": "" },
-  "sale_banner": { "enabled": true, "message": "Este sitio está en venta: dominio, contenido y tráfico orgánico.", "cta_label": "Ver detalles", "cta_href": "/sitio-en-venta/", "variant": "dark" },
+  "sale_banner": { "enabled": true, "modo": "venta_o_alquiler", "headline": "Este sitio web está en venta o alquiler", "message": "…", "whatsapp_number": "", "show_whatsapp": false, "…": "…", "version": "a6010a78843c" },
   "menus": {
     "header": [{ "label": "Alquiler", "href": "/alquiler-de-banos-portatiles/", "children": [{ "label": "Medellín", "href": "/alquiler-de-banos-portatiles/medellin/" }] }],
     "footer": [{ "title": "Servicios", "links": [{ "label": "Alquiler de baños portátiles", "href": "/alquiler-de-banos-portatiles/" }] }]
@@ -275,11 +314,11 @@ sitio» en la barra superior y un widget del dashboard con el último disparo, s
 
 | Herramienta | Resultado |
 |---|---|
-| `vendor/bin/pest` | 109 tests / 459 aserciones (HtmlCleaner, Slugger, UriResolver, HMAC, PreviewToken, validación, email y rate limit de leads, normalizadores, ciudades, round-trip seed → SCF → API, grupos SCF, bundle, HTTP/CORS, SMTP y flags de configuración) |
+| `vendor/bin/pest` | 158 tests / 591 aserciones (HtmlCleaner, Slugger, UriResolver, HMAC, PreviewToken, validación, email y rate limit de leads, normalizadores, ciudades, round-trip seed → SCF → API, grupos SCF, bundle, HTTP/CORS, SMTP, flags; aviso de venta: saneamiento, E.164, contraste WCAG, forma del REST y exclusión de rutas) |
 | `vendor/bin/pint --test` | preset laravel + `declare_strict_types` |
 | `vendor/bin/phpstan` | **nivel 8**, `phpVersion` 8.3, con stubs de WordPress, SCF/ACF y WP-CLI, sin baseline ni ignores |
-| `tests/smoke.sh` | 94 comprobaciones end-to-end (endpoints, forma del JSON, ETag/304, invalidación, leads 201/401/422/429, replay, email del lead con To/Cc/Reply-To/HTML, `BP_LEADS_EMAIL=false`, fallo SMTP → `email_failed` → `leads resend`, SMTP con STARTTLS + AUTH obligatorios, webhook firmado, 301 del front, robots, previews, hardening, CORS, deploy hook) |
-| `deploy/cloudpanel/sim/run.sh` | 13 comprobaciones del deploy real contra un CloudPanel simulado (pasada nueva + idempotente) |
+| `tests/smoke.sh` | 110 comprobaciones end-to-end (endpoints, forma del JSON, ETag/304, invalidación, leads 201/401/422/429, replay, email del lead con To/Cc/Reply-To/HTML, `BP_LEADS_EMAIL=false`, fallo SMTP → `email_failed` → `leads resend`, SMTP con STARTTLS + AUTH obligatorios, webhook firmado, 301 del front, robots, previews, hardening, CORS, deploy hook, aviso de venta: forma, 304, `?path`, fuente única con `/site`, guardar y publicar desde el admin) |
+| `deploy/cloudpanel/sim/run.sh` | 14 comprobaciones del deploy real contra un CloudPanel simulado (pasada nueva + idempotente) |
 
 ## Despliegue
 

@@ -39,6 +39,7 @@ x-wp-env: &wp-env
 x-wp-volumes: &wp-volumes
   - wp_data:/var/www/html
   - ./wp-content/plugins/bp-headless:/var/www/html/wp-content/plugins/bp-headless
+  - ./wp-content/plugins/bp-sitio-en-venta:/var/www/html/wp-content/plugins/bp-sitio-en-venta
   - ./wp-content/themes/bp-headless-theme:/var/www/html/wp-content/themes/bp-headless-theme
 
 services:
@@ -134,6 +135,7 @@ services:
     volumes:
       - wp_data:/var/www/html
       - ./wp-content/plugins/bp-headless:/var/www/html/wp-content/plugins/bp-headless
+      - ./wp-content/plugins/bp-sitio-en-venta:/var/www/html/wp-content/plugins/bp-sitio-en-venta
       - ./wp-content/themes/bp-headless-theme:/var/www/html/wp-content/themes/bp-headless-theme
       - ./bin:/opt/bp/bin:ro
       - ${BP_SEED_DIR:-./seed-sample}:/opt/bp/seed:ro

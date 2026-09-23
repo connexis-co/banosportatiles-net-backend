@@ -16,5 +16,7 @@ final class CacheInvalidator implements Hookable
     public function register(): void
     {
         add_action(ContentChangeListener::ACTION, [$this->cache, 'flush'], 5, 0);
+        // bp-sitio-en-venta: saving the notice refreshes /site → sale_banner; publishing is explicit (request_deploy).
+        add_action('bp_sitio_en_venta/updated', [$this->cache, 'flush'], 5, 0);
     }
 }

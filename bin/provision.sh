@@ -69,7 +69,7 @@ wp theme activate bp-headless-theme --quiet
 for theme in $(wp theme list --status=inactive --field=name); do
   wp theme delete "$theme" --quiet
 done
-wp plugin activate bp-headless --quiet
+wp plugin activate bp-headless bp-sitio-en-venta --quiet
 
 say "Redirection database"
 wp redirection database install >/dev/null 2>&1 || true

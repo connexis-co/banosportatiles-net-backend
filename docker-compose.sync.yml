@@ -4,6 +4,7 @@
 x-sync-volumes: &sync-volumes
   - wp_data:/var/www/html
   - bp_plugin:/var/www/html/wp-content/plugins/bp-headless
+  - bp_venta:/var/www/html/wp-content/plugins/bp-sitio-en-venta
   - bp_theme:/var/www/html/wp-content/themes/bp-headless-theme
 
 services:
@@ -15,6 +16,7 @@ services:
     volumes:
       - wp_data:/var/www/html
       - bp_plugin:/var/www/html/wp-content/plugins/bp-headless
+      - bp_venta:/var/www/html/wp-content/plugins/bp-sitio-en-venta
       - bp_theme:/var/www/html/wp-content/themes/bp-headless-theme
       - bp_bin:/opt/bp/bin
       - bp_seed:/opt/bp/seed
@@ -26,6 +28,7 @@ services:
 
 volumes:
   bp_plugin:
+  bp_venta:
   bp_theme:
   bp_bin:
   bp_seed:

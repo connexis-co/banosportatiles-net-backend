@@ -194,6 +194,7 @@ final class FieldValueMapper
 
     /**
      * site.yaml → options page values (only the groups present in the seed are returned).
+     * sale_banner is not here: it belongs to the bp-sitio-en-venta plugin (see SeedImporter::importSite).
      *
      * @param  array<array-key, mixed>  $site
      * @return array<string, mixed>
@@ -206,7 +207,6 @@ final class FieldValueMapper
             'legal' => ['responsable', 'razon_social', 'nit', 'direccion', 'ciudad', 'email_datos'],
             'analytics' => ['ga4', 'gtm'],
             'forms' => ['turnstile_site_key', 'leads_email', 'leads_webhook_url'],
-            'sale_banner' => ['message', 'cta_label', 'cta_href', 'variant'],
         ];
 
         $values = [];
@@ -221,9 +221,6 @@ final class FieldValueMapper
             }
         }
 
-        if (isset($site['sale_banner']) && is_array($site['sale_banner'])) {
-            $values['sale_banner']['enabled'] = Arr::bool($site['sale_banner'], 'enabled') ? 1 : 0;
-        }
         if (isset($site['brand']) && is_array($site['brand']) && ($site['brand']['logo'] ?? '') !== '') {
             $values['brand']['logo'] = $this->lookup->imageId($site['brand']['logo']) ?? '';
         }

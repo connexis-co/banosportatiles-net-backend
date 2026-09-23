@@ -26,10 +26,32 @@
     },
     "sale_banner": {
       "enabled": true,
-      "message": "Este sitio está en venta: dominio, contenido y tráfico orgánico.",
-      "cta_label": "Ver detalles",
-      "cta_href": "/sitio-en-venta/",
-      "variant": "dark"
+      "modo": "venta_o_alquiler",
+      "headline": "Este sitio web está en venta o alquiler",
+      "message": "Dominio, contenido y posicionamiento en el nicho de baños portátiles en Colombia, disponibles para compra o alquiler.",
+      "whatsapp_number": "",
+      "whatsapp_message": "Hola, me interesa el sitio {sitio} ({url}). ¿Qué opciones de compra o alquiler tienen?",
+      "show_whatsapp": true,
+      "cta_whatsapp_label": "Consultar por WhatsApp",
+      "show_secondary": true,
+      "secondary_label": "Ver detalles",
+      "secondary_url": "/sitio-en-venta/",
+      "colors": {
+        "bg": "#0f172a",
+        "text": "#f8fafc",
+        "accent": "#25d366",
+        "accent_text": "#052e16"
+      },
+      "placements": [
+        "top_bar",
+        "bottom_bar",
+        "sidebar_card"
+      ],
+      "dismissible": true,
+      "dismiss_days": 7,
+      "exclude_paths": [
+        "/cotizar/"
+      ]
     },
     "menus": {
       "header": [

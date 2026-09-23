@@ -10,6 +10,7 @@ bp_load_env
 
 BASE="${WP_URL:-http://localhost:8080}"
 API="$BASE/wp-json/bp/v1"
+VENTA="$BASE/wp-json/bp-venta/v1"
 FRONT="${BP_FRONTEND_URL:-http://localhost:4321}"
 MAILPIT="http://localhost:${MAILPIT_PORT:-8025}"
 TMP="$(mktemp -d)"
@@ -238,6 +239,36 @@ http "CORS preflight desde el front" 200 -X OPTIONS "$API/site" -H "Origin: $FRO
 expect_header "Access-Control-Allow-Origin = front" "Access-Control-Allow-Origin: $FRONT"
 http "CORS desde otro origen" 200 "$API/site" -H 'Origin: https://evil.example'
 expect_no_header "sin Access-Control-Allow-Origin para orígenes ajenos" 'Access-Control-Allow-Origin'
+
+section "9b. Aviso «sitio en venta» (plugin bp-sitio-en-venta)"
+http "GET /bp-venta/v1/config" 200 "$VENTA/config"
+expect_json "forma del objeto (16 claves + version) y tipos" '(keys | length == 17) and (.enabled | type == "boolean") and (.modo | IN("venta","alquiler","venta_o_alquiler")) and (.colors | keys) == ["accent","accent_text","bg","text"] and (.placements | type == "array") and (.dismiss_days | type == "number") and (.version | test("^[0-9a-f]{12}$"))'
+expect_header "Cache-Control público" 'Cache-Control: public, max-age=60'
+venta_etag="$(grep -i '^ETag:' "$TMP/headers" | cut -d' ' -f2 | tr -d '\r')"
+http "config con If-None-Match → 304" 304 -H "If-None-Match: $venta_etag" "$VENTA/config"
+http "config?path=/cotizar/ (ruta excluida)" 200 "$VENTA/config?path=/cotizar/"
+expect_json "visible=false en una ruta excluida" '.visible == false'
+http "config?path=/alquiler-de-banos-portatiles/" 200 "$VENTA/config?path=/alquiler-de-banos-portatiles/"
+expect_json "visible=true en el resto" '.visible == true'
+curl -s "$VENTA/config" > "$TMP/venta.json"
+curl -s "$API/site" | jq '.sale_banner' > "$TMP/site-banner.json"
+if jq -e --slurpfile a "$TMP/venta.json" '. == $a[0]' "$TMP/site-banner.json" >/dev/null; then ok "/site → sale_banner es el mismo objeto (fuente única)"; else ko "/site → sale_banner distinto de /bp-venta/v1/config"; fi
+wp eval '
+wp_set_current_user(1);
+$_POST = $_REQUEST = ["_wpnonce" => wp_create_nonce("bp_sitio_en_venta_save"), "publish" => "1", "bpsev" => [
+  "enabled" => "1", "modo" => "venta", "headline" => "Titular de prueba smoke", "message" => "", "whatsapp_number" => "300 000 0000",
+  "show_whatsapp" => "1", "cta_whatsapp_label" => "", "show_secondary" => "1", "secondary_label" => "", "secondary_url" => "/sitio-en-venta/",
+  "colors" => ["bg" => "#0f172a", "text" => "#f8fafc", "accent" => "#25d366", "accent_text" => "#052e16"],
+  "placements" => ["top_bar"], "dismissible" => "1", "dismiss_days" => "5", "exclude_paths" => "/cotizar/"]];
+(new BanosPortatiles\SitioEnVenta\Admin\SettingsPage(BanosPortatiles\SitioEnVenta\Plugin::store()))->save();' >/dev/null
+http "config tras «Guardar y publicar» desde el admin" 200 "$VENTA/config"
+expect_json "cambios visibles al instante (caché invalidada) y E.164 normalizado" '.headline == "Titular de prueba smoke" and .whatsapp_number == "+573000000000" and .show_whatsapp == true and .dismiss_days == 5 and .placements == ["top_bar"] and (.message | startswith("Dominio"))'
+[[ "$(jq -r .version "$TMP/body")" != "$(jq -r .version "$TMP/venta.json")" ]] && ok "version cambia (el front reinicia los avisos cerrados)" || ko "version sin cambios"
+[[ "$(curl -s "$API/site" | jq -r '.sale_banner.headline')" == "Titular de prueba smoke" ]] && ok "/site → sale_banner actualizado (caché de bp-headless invalidada)" || ko "/site → sale_banner desactualizado"
+[[ "$(wp transient get bp_sitio_en_venta_notice_1 --format=json | jq -r '.published')" == "scheduled" ]] && ok "«Guardar y publicar» programó el deploy vía bp-headless" || ko "publicación no programada"
+[[ "$(wp cron event list --hook=bp_headless_deploy --format=count)" == "1" ]] && ok "evento bp_headless_deploy en cola (debounce)" || ko "evento de deploy"
+wp eval 'BanosPortatiles\SitioEnVenta\Plugin::store()->import(json_decode((string) file_get_contents("/opt/bp/seed/bundle.json"), true)["site"]["sale_banner"]);' >/dev/null
+[[ "$(curl -s "$VENTA/config" | jq -r .version)" == "$(jq -r .version "$TMP/venta.json")" ]] && ok "aviso restaurado desde el seed" || ko "restaurar el aviso"
 
 section "10. Deploy hook (debounce 60 s con WP-Cron)"
 docker compose exec -T hook-sink sh -c ': > /sink/requests.log' >/dev/null 2>&1

@@ -57,8 +57,8 @@ fi
 : "${FRONTEND_URL:=https://banosportatiles.net}"
 : "${PHP_VERSION:=8.4}"
 : "${SITE_USER:=banosportatiles-cms}"
-: "${DB_NAME:=banosportatiles_cms}"
-: "${DB_USER:=banosportatiles_cms}"
+: "${DB_NAME:=banosportatiles-cms}"
+: "${DB_USER:=banosportatiles-cms}"
 : "${VHOST_TEMPLATE:=BP-Headless-WordPress-v1}"
 : "${WP_TITLE:=BañosPortátiles.net CMS}"
 : "${WP_ADMIN_USER:=bp-admin}"
@@ -112,12 +112,13 @@ done
 # --- 2. Validation -----------------------------------------------------------------------------------
 [[ "$CMS_DOMAIN" =~ ^[a-z0-9]([a-z0-9-]*[a-z0-9])?(\.[a-z0-9]([a-z0-9-]*[a-z0-9])?)+$ ]] || die "CMS_DOMAIN inválido: $CMS_DOMAIN"
 [[ "$SITE_USER" =~ ^[a-z][a-z0-9-]{2,31}$ ]] || die "SITE_USER inválido (minúsculas, dígitos y guiones, 3–32): $SITE_USER"
-[[ "$DB_NAME" =~ ^[A-Za-z0-9_]{1,64}$ && "$DB_USER" =~ ^[A-Za-z0-9_]{1,32}$ ]] || die "DB_NAME/DB_USER inválidos."
+[[ "$DB_NAME" =~ ^[A-Za-z0-9-]{1,64}$ && "$DB_USER" =~ ^[A-Za-z0-9-]{1,32}$ ]] || die "DB_NAME/DB_USER inválidos (CloudPanel: letras, dígitos y guiones)."
 [[ "$PHP_VERSION" =~ ^8\.[3-9]$ ]] || die "PHP_VERSION debe ser 8.3 o superior: $PHP_VERSION"
 [[ "$BP_LEADS_EMAIL" == "true" || "$BP_LEADS_EMAIL" == "false" ]] || die "BP_LEADS_EMAIL debe ser true o false."
 [[ "$FRONTEND_URL" =~ ^https://[^/]+$ ]] || die "FRONTEND_URL debe ser https://dominio sin barra final."
 [[ -f "$BACKEND_DIR/wp-content/plugins/bp-headless/bp-headless.php" ]] || die "No se encuentra el plugin bp-headless."
 [[ -f "$BACKEND_DIR/wp-content/themes/bp-headless-theme/style.css" ]] || die "No se encuentra el tema bp-headless-theme."
+[[ -f "$BACKEND_DIR/wp-content/plugins/bp-sitio-en-venta/bp-sitio-en-venta.php" ]] || die "No se encuentra el plugin bp-sitio-en-venta."
 if [[ -n "$SEED_DIR" ]]; then
   SEED_DIR="$(cd "$SEED_DIR" 2>/dev/null && pwd -P)" || die "--seed: la carpeta no existe."
   [[ -f "$SEED_DIR/bundle.json" ]] || die "--seed: falta $SEED_DIR/bundle.json."
@@ -152,7 +153,7 @@ remote_payload() { # remote_payload <mask 0|1>: exported configuration + remote.
 
 SSH_BIN="${SSH_BIN:-ssh}"
 RSYNC=(rsync -az --delete -e "$SSH_BIN" --exclude=.DS_Store --exclude='._*')
-SOURCES=("$BACKEND_DIR/wp-content/plugins/bp-headless" "$BACKEND_DIR/wp-content/themes/bp-headless-theme" "$SCRIPT_DIR/bp-headless-wordpress.tpl")
+SOURCES=("$BACKEND_DIR/wp-content/plugins/bp-headless" "$BACKEND_DIR/wp-content/plugins/bp-sitio-en-venta" "$BACKEND_DIR/wp-content/themes/bp-headless-theme" "$SCRIPT_DIR/bp-headless-wordpress.tpl")
 
 if [[ "$DRY_RUN" == "1" ]]; then
   printf '\033[1m# deploy/cloudpanel/deploy.sh --dry-run → %s (%s). No se ejecuta nada.\033[0m\n\n' "$SSH_HOST" "$CMS_DOMAIN"
@@ -178,7 +179,7 @@ STAGE_DIR="${remote_info#* }/$STAGE_REL"
 remote_shell="bash -s"
 [[ "$remote_uid" == "0" ]] || remote_shell="sudo -n bash -s"
 
-log "Subiendo plugin, tema y plantilla de vhost (rsync → ~/$STAGE_REL)"
+log "Subiendo plugins, tema y plantilla de vhost (rsync → ~/$STAGE_REL)"
 "${RSYNC[@]}" "${SOURCES[@]}" "$SSH_HOST:$STAGE_REL/"
 if [[ -n "$SEED_DIR" ]]; then
   log "Subiendo seed ($SEED_DIR)"

@@ -1,0 +1,81 @@
+/* «Sitio en venta» admin screen */
+.bpsev { max-width: 1320px; }
+.bpsev-header { display: flex; align-items: center; gap: 12px; flex-wrap: wrap; }
+.bpsev-header h1 { display: flex; align-items: center; gap: 8px; }
+.bpsev-header .dashicons { font-size: 28px; width: 28px; height: 28px; color: #2271b1; }
+.bpsev-status { padding: 3px 12px; border-radius: 999px; font-weight: 600; font-size: 12px; }
+.bpsev-status.is-on { background: #d1fae5; color: #065f46; }
+.bpsev-status.is-off { background: #f0f0f1; color: #50575e; }
+.bpsev-intro { max-width: 760px; font-size: 14px; color: #3c434a; }
+.bpsev-notice-list { margin: .5em 0 .5em 1.2em; list-style: disc; }
+
+.bpsev-layout {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 380px;
+  grid-template-areas: "main side" "actions actions";
+  gap: 20px;
+  margin-top: 16px;
+}
+.bpsev-main { grid-area: main; display: grid; gap: 16px; }
+.bpsev-side { grid-area: side; }
+.bpsev-preview { position: sticky; top: 46px; }
+.bpsev-actions {
+  grid-area: actions;
+  position: sticky;
+  bottom: 0;
+  z-index: 5;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 10px;
+  padding: 12px 16px;
+  background: #fff;
+  border: 1px solid #dcdcde;
+  border-radius: 8px;
+  box-shadow: 0 -2px 12px rgba(0, 0, 0, .06);
+}
+
+.bpsev-card { background: #fff; border: 1px solid #dcdcde; border-radius: 8px; padding: 18px 20px; }
+.bpsev-card header h2, .bpsev-preview h2 { margin: 0 0 4px; font-size: 16px; }
+.bpsev-card header p { margin: 0 0 14px; color: #50575e; }
+.bpsev-card__body { display: grid; gap: 14px; }
+
+.bpsev-field { position: relative; display: grid; gap: 6px; }
+.bpsev-field > label { font-weight: 600; }
+.bpsev-field .regular-text, .bpsev-field .large-text { width: 100%; max-width: 100%; }
+.bpsev-field .description { margin: 0; }
+.bpsev-counter { position: absolute; top: 0; right: 0; font-size: 12px; color: #646970; font-variant-numeric: tabular-nums; }
+.bpsev-counter.is-near { color: #b32d2e; font-weight: 600; }
+.bpsev-hint { margin: -6px 0 0; font-size: 13px; }
+.bpsev-hint.is-ok { color: #007017; }
+.bpsev-hint.is-error { color: #b32d2e; }
+
+.bpsev-switch { display: inline-flex; align-items: center; gap: 10px; cursor: pointer; font-weight: 600; }
+.bpsev-switch input { position: absolute; opacity: 0; width: 1px; height: 1px; }
+.bpsev-switch__ui { position: relative; width: 38px; height: 22px; border-radius: 999px; background: #8c8f94; transition: background .15s; flex: none; }
+.bpsev-switch__ui::after { content: ""; position: absolute; top: 3px; left: 3px; width: 16px; height: 16px; border-radius: 50%; background: #fff; transition: transform .15s; }
+.bpsev-switch input:checked + .bpsev-switch__ui { background: #2271b1; }
+.bpsev-switch input:checked + .bpsev-switch__ui::after { transform: translateX(16px); }
+.bpsev-switch input:focus-visible + .bpsev-switch__ui { outline: 2px solid #2271b1; outline-offset: 2px; }
+
+.bpsev-colors { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); gap: 12px 16px; }
+.bpsev-contrast { margin: 0; display: grid; gap: 6px; }
+.bpsev-contrast li { margin: 0; padding: 6px 10px; border-radius: 6px; background: #edfaef; color: #00450c; }
+.bpsev-contrast li.is-fail { background: #fcf0f1; color: #8a2424; font-weight: 600; }
+
+.bpsev-checks { display: grid; grid-template-columns: repeat(auto-fill, minmax(220px, 1fr)); gap: 10px; border: 0; margin: 0; padding: 0; }
+.bpsev-check { display: flex; gap: 10px; align-items: flex-start; padding: 10px 12px; border: 1px solid #dcdcde; border-radius: 6px; cursor: pointer; }
+.bpsev-check:has(input:checked) { border-color: #2271b1; background: #f0f6fc; }
+.bpsev-check span { display: grid; gap: 2px; }
+.bpsev-check small { color: #50575e; }
+
+.bpsev-preview__label { margin: 16px 0 6px; font-size: 11px; font-weight: 600; text-transform: uppercase; letter-spacing: .05em; color: #646970; }
+.bpsev-preview .bpv-card { max-width: none; }
+
+@media (max-width: 1100px) {
+  .bpsev-layout { grid-template-columns: 1fr; grid-template-areas: "side" "main" "actions"; }
+  .bpsev-preview { position: static; }
+}
+@media (max-width: 600px) {
+  .bpsev-colors { grid-template-columns: 1fr; }
+}

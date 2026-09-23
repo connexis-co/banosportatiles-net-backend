@@ -73,8 +73,8 @@ it('maps gallery images to attachment IDs and reports unknown references', funct
 it('maps site.yaml to the options page groups', function (): void {
     $values = (new FieldValueMapper(new FakeSeedLookup))->site(sampleBundle()['site']);
 
-    expect($values)->toHaveKeys(['brand', 'contact', 'legal', 'analytics', 'sale_banner', 'menus'])
-        ->and($values['sale_banner']['enabled'])->toBe(1)
+    expect($values)->toHaveKeys(['brand', 'contact', 'legal', 'analytics', 'menus'])
+        ->not->toHaveKey('sale_banner') // lives in the bp-sitio-en-venta plugin
         ->and($values['legal'])->toHaveKeys(['razon_social', 'nit', 'direccion'])
         ->and($values['menus']['header'][0]['children'])->toHaveCount(2);
 });
