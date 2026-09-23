@@ -1,0 +1,201 @@
+<?php
+
+declare(strict_types=1);
+
+namespace BanosPortatiles\Headless\Normalizer;
+
+use BanosPortatiles\Headless\Config;
+use BanosPortatiles\Headless\Content\Taxonomies;
+use BanosPortatiles\Headless\Fields\FieldReader;
+use BanosPortatiles\Headless\Routing\UriResolver;
+use BanosPortatiles\Headless\Support\Arr;
+
+/**
+ * "Ajustes del sitio" + ciudades + categorías → GET /bp/v1/site. Keys mirror seed/site.yaml.
+ */
+final class SiteNormalizer
+{
+    public function __construct(
+        private readonly FieldReader $fields,
+        private readonly ReferenceResolver $refs,
+        private readonly UriResolver $uris,
+    ) {}
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function normalize(): array
+    {
+        $brand = $this->option('brand');
+        $contact = $this->option('contact');
+        $legal = $this->option('legal');
+        $analytics = $this->option('analytics');
+        $forms = $this->option('forms');
+        $banner = $this->option('sale_banner');
+        $menus = $this->option('menus');
+        $logoId = Arr::ids($brand['logo'] ?? null)[0] ?? 0;
+
+        return [
+            'brand' => [
+                'name' => Arr::string($brand, 'name') ?: (string) get_bloginfo('name'),
+                'tagline' => Arr::string($brand, 'tagline'),
+            ] + Arr::withoutEmpty(['logo' => $logoId > 0 ? $this->refs->image($logoId) : null]),
+            'contact' => self::pick($contact, ['whatsapp', 'phone', 'email', 'horario']),
+            'social' => $this->social(),
+            'legal' => self::pick($legal, ['responsable', 'razon_social', 'nit', 'direccion', 'ciudad', 'email_datos']),
+            'analytics' => self::pick($analytics, ['ga4', 'gtm']),
+            'forms' => self::pick($forms, ['turnstile_site_key']),
+            'sale_banner' => [
+                'enabled' => Arr::bool($banner, 'enabled'),
+                'message' => Arr::string($banner, 'message'),
+                'cta_label' => Arr::string($banner, 'cta_label'),
+                'cta_href' => Arr::string($banner, 'cta_href'),
+                'variant' => Arr::string($banner, 'variant') ?: 'dark',
+            ],
+            'menus' => [
+                'header' => self::headerMenu(Arr::rows($menus, 'header')),
+                'footer' => self::footerMenu(Arr::rows($menus, 'footer')),
+            ],
+            'ciudades' => $this->ciudades(),
+            'categorias' => $this->categorias(),
+        ];
+    }
+
+    /**
+     * @param  list<array<array-key, mixed>>  $rows
+     * @return list<array{label: string, href: string, children: list<array{label: string, href: string}>}>
+     */
+    public static function headerMenu(array $rows): array
+    {
+        $items = [];
+        foreach ($rows as $row) {
+            $link = SectionsNormalizer::link($row);
+            if ($link !== null) {
+                $items[] = $link + ['children' => self::links(Arr::rows($row, 'children'))];
+            }
+        }
+
+        return $items;
+    }
+
+    /**
+     * @param  list<array<array-key, mixed>>  $rows
+     * @return list<array{title: string, links: list<array{label: string, href: string}>}>
+     */
+    public static function footerMenu(array $rows): array
+    {
+        $columns = [];
+        foreach ($rows as $row) {
+            $links = self::links(Arr::rows($row, 'links'));
+            if (Arr::string($row, 'title') !== '' || $links !== []) {
+                $columns[] = ['title' => Arr::string($row, 'title'), 'links' => $links];
+            }
+        }
+
+        return $columns;
+    }
+
+    /**
+     * @param  list<array<array-key, mixed>>  $rows
+     * @return list<array{label: string, href: string}>
+     */
+    private static function links(array $rows): array
+    {
+        return array_values(array_filter(array_map(SectionsNormalizer::link(...), $rows)));
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $data
+     * @param  list<string>  $keys
+     * @return array<string, string>
+     */
+    private static function pick(array $data, array $keys): array
+    {
+        $out = [];
+        foreach ($keys as $key) {
+            $out[$key] = Arr::string($data, $key);
+        }
+
+        return $out;
+    }
+
+    /** @return array<array-key, mixed> */
+    private function option(string $name): array
+    {
+        $value = $this->fields->get($name, Config::OPTIONS_ID);
+
+        return is_array($value) ? $value : [];
+    }
+
+    /** @return list<array{network: string, url: string}> */
+    private function social(): array
+    {
+        $out = [];
+        foreach (Arr::rows(['s' => $this->fields->get('social', Config::OPTIONS_ID)], 's') as $row) {
+            if (Arr::string($row, 'url') !== '') {
+                $out[] = ['network' => Arr::string($row, 'network'), 'url' => Arr::string($row, 'url')];
+            }
+        }
+
+        return $out;
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function ciudades(): array
+    {
+        $terms = get_terms(['taxonomy' => Taxonomies::CIUDAD, 'hide_empty' => false, 'orderby' => 'name']);
+        if (! is_array($terms)) {
+            return [];
+        }
+
+        $out = [];
+        foreach ($terms as $term) {
+            if (! $term instanceof \WP_Term) {
+                continue;
+            }
+            $ref = 'term_'.$term->term_id;
+            $cercanos = $this->fields->get('cercanos', $ref);
+            $out[] = array_filter([
+                'slug' => $term->slug,
+                'name' => html_entity_decode($term->name, ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+                'departamento' => is_string($d = $this->fields->get('departamento', $ref)) ? trim($d) : '',
+                'lat' => Arr::float(['v' => $this->fields->get('lat', $ref)], 'v'),
+                'lng' => Arr::float(['v' => $this->fields->get('lng', $ref)], 'v'),
+                'cercanos' => is_string($cercanos) ? Arr::lines($cercanos) : [],
+                'nota' => is_string($n = $this->fields->get('nota', $ref)) ? trim($n) : '',
+            ], static fn (mixed $v): bool => $v !== null);
+        }
+
+        return $out;
+    }
+
+    /** @return list<array<string, mixed>> */
+    private function categorias(): array
+    {
+        $terms = get_terms(['taxonomy' => 'category', 'hide_empty' => false, 'orderby' => 'name']);
+        if (! is_array($terms)) {
+            return [];
+        }
+
+        $default = (int) get_option('default_category');
+        $out = [];
+        foreach ($terms as $term) {
+            if (! $term instanceof \WP_Term || ($term->term_id === $default && $term->count === 0)) {
+                continue;
+            }
+            $pillarId = Arr::ids($this->fields->get('pillar', 'term_'.$term->term_id))[0] ?? 0;
+            $out[] = [
+                'slug' => $term->slug,
+                'name' => html_entity_decode($term->name, ENT_QUOTES | ENT_HTML5, 'UTF-8'),
+                'description' => trim($term->description),
+                'uri' => (string) $this->uris->forTerm($term),
+                'count' => $term->count,
+            ] + Arr::withoutEmpty([
+                'pillar' => $pillarId > 0 ? $this->refs->slug($pillarId) : null,
+                'pillarUri' => $pillarId > 0 ? $this->refs->uri($pillarId) : null,
+            ]);
+        }
+
+        return $out;
+    }
+}

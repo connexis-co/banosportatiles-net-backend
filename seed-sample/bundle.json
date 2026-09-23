@@ -1,0 +1,607 @@
+{
+  "version": 1,
+  "site": {
+    "brand": {
+      "name": "BañosPortátiles.net",
+      "tagline": "Baños portátiles y saneamiento en Colombia",
+      "logo": ""
+    },
+    "contact": {
+      "whatsapp": "",
+      "phone": "",
+      "email": "",
+      "horario": "Lun–Sáb 7:00–18:00"
+    },
+    "legal": {
+      "responsable": "",
+      "razon_social": "",
+      "nit": "",
+      "direccion": "",
+      "ciudad": "",
+      "email_datos": ""
+    },
+    "analytics": {
+      "ga4": "",
+      "gtm": ""
+    },
+    "sale_banner": {
+      "enabled": true,
+      "message": "Este sitio está en venta: dominio, contenido y tráfico orgánico.",
+      "cta_label": "Ver detalles",
+      "cta_href": "/sitio-en-venta/",
+      "variant": "dark"
+    },
+    "menus": {
+      "header": [
+        {
+          "label": "Alquiler",
+          "href": "/alquiler-de-banos-portatiles/",
+          "children": [
+            {
+              "label": "Medellín",
+              "href": "/alquiler-de-banos-portatiles/medellin/"
+            },
+            {
+              "label": "Cali",
+              "href": "/alquiler-de-banos-portatiles/cali/"
+            }
+          ]
+        },
+        {
+          "label": "Equipos",
+          "href": "/equipos/",
+          "children": []
+        },
+        {
+          "label": "Blog",
+          "href": "/blog/",
+          "children": []
+        },
+        {
+          "label": "Cotizar",
+          "href": "/cotizar/",
+          "children": []
+        }
+      ],
+      "footer": [
+        {
+          "title": "Servicios",
+          "links": [
+            {
+              "label": "Alquiler de baños portátiles",
+              "href": "/alquiler-de-banos-portatiles/"
+            }
+          ]
+        },
+        {
+          "title": "Guías",
+          "links": [
+            {
+              "label": "Pozo séptico: guía",
+              "href": "/blog/pozo-septico-guia/"
+            }
+          ]
+        }
+      ]
+    }
+  },
+  "ciudades": [
+    {
+      "slug": "medellin",
+      "name": "Medellín",
+      "departamento": "Antioquia",
+      "lat": 6.2442,
+      "lng": -75.5812,
+      "cercanos": [
+        "Envigado",
+        "Bello",
+        "Itagüí",
+        "Sabaneta",
+        "Rionegro"
+      ],
+      "nota": "Valle de Aburrá: laderas y vías estrechas en varios sectores; conviene confirmar el acceso del camión de servicio."
+    },
+    {
+      "slug": "cali",
+      "name": "Cali",
+      "departamento": "Valle del Cauca",
+      "lat": 3.4516,
+      "lng": -76.532,
+      "cercanos": [
+        "Jamundí",
+        "Palmira",
+        "Yumbo",
+        "Candelaria"
+      ],
+      "nota": "Clima cálido todo el año: la frecuencia de limpieza pesa más en eventos largos al aire libre."
+    }
+  ],
+  "categorias": [
+    {
+      "slug": "pozos-septicos",
+      "name": "Pozos y tanques sépticos",
+      "description": "Qué son, cómo funcionan y cómo se mantienen los sistemas sépticos.",
+      "pillar": "pozo-septico-guia"
+    }
+  ],
+  "faqs": [
+    {
+      "id": "faq-cuantos-banos-por-persona",
+      "q": "¿Cuántos baños portátiles necesito?",
+      "temas": [
+        "eventos",
+        "obras"
+      ],
+      "a": "Depende del tipo de uso, la duración y el número de personas. En obras y lugares de trabajo, la Resolución 2400 de 1979 (art. 17) pide como mínimo un sanitario por cada 15 trabajadores. Para eventos, el cálculo cambia según la duración y el consumo de bebidas: pide una cotización con esos datos."
+    },
+    {
+      "id": "faq-cada-cuanto-se-limpia",
+      "q": "¿Cada cuánto se hace el mantenimiento de un baño portátil?",
+      "temas": [
+        "mantenimiento"
+      ],
+      "a": "La frecuencia se acuerda según el número de usuarios y los días de servicio. En alquileres de varios días lo habitual es programar succión, lavado y reposición de insumos de forma periódica; confirma la frecuencia incluida antes de firmar."
+    },
+    {
+      "id": "faq-que-incluye-el-alquiler",
+      "q": "¿Qué incluye normalmente el alquiler?",
+      "temas": [
+        "alquiler"
+      ],
+      "a": "Suele incluir transporte, instalación, retiro y los mantenimientos pactados. El papel higiénico, el gel y los lavamanos pueden cobrarse aparte: pide que la cotización lo detalle por escrito."
+    }
+  ],
+  "redirects": [
+    {
+      "from": "/medellin/",
+      "to": "/alquiler-de-banos-portatiles/medellin/",
+      "code": 301
+    },
+    {
+      "from": "/cali/",
+      "to": "/alquiler-de-banos-portatiles/cali/",
+      "code": 301
+    }
+  ],
+  "pages": [
+    {
+      "uri": "/",
+      "title": "Inicio",
+      "template": "home",
+      "order": 0,
+      "excerpt": "Baños portátiles, lavamanos y saneamiento para obras y eventos en Colombia.",
+      "seo": {
+        "title": "Baños portátiles en Colombia | Alquiler y venta",
+        "description": "Alquiler y venta de baños portátiles para obras y eventos en Colombia. Compara equipos, conoce la norma y pide tu cotización en minutos.",
+        "keyword": "baños portátiles",
+        "keywords_secundarias": [
+          "alquiler de baños portátiles",
+          "baños portátiles colombia"
+        ],
+        "intencion": "comercial",
+        "noindex": false
+      },
+      "hero": {
+        "eyebrow": "Cobertura nacional",
+        "h1": "Baños portátiles para obras y eventos en Colombia",
+        "lead": "Compara opciones, entiende qué pide la norma y cotiza el servicio que necesitas.",
+        "bullets": [
+          "Alquiler y venta",
+          "Mantenimiento programado",
+          "Lavamanos y duchas portátiles"
+        ],
+        "image": {
+          "src": "../../../assets/images/placeholder-hero.webp",
+          "alt": "Imagen de ejemplo (placeholder) del seed"
+        },
+        "cta_primario": {
+          "label": "Cotizar ahora",
+          "href": "/cotizar/"
+        },
+        "cta_secundario": {
+          "label": "Escribir por WhatsApp",
+          "href": "whatsapp"
+        },
+        "mostrar_formulario": true
+      },
+      "sections": [
+        {
+          "layout": "features_grid",
+          "title": "Qué encuentras aquí",
+          "intro": "Información clara para decidir.",
+          "items": [
+            {
+              "icon": "truck",
+              "title": "Logística",
+              "text": "Qué revisar para que el camión llegue y pueda hacer el mantenimiento."
+            },
+            {
+              "icon": "shield-check",
+              "title": "Norma",
+              "text": "Lo que exige la Resolución 2400 de 1979 en lugares de trabajo."
+            }
+          ]
+        },
+        {
+          "layout": "contenido"
+        },
+        {
+          "layout": "services_grid",
+          "title": "Servicios",
+          "items": [
+            "/alquiler-de-banos-portatiles/"
+          ]
+        },
+        {
+          "layout": "equipment_grid",
+          "title": "Equipos disponibles",
+          "items": [
+            "bano-portatil-estandar"
+          ]
+        },
+        {
+          "layout": "coverage",
+          "title": "Ciudades con cobertura",
+          "items": [
+            "medellin",
+            "cali"
+          ]
+        },
+        {
+          "layout": "related_posts",
+          "title": "Guías relacionadas",
+          "items": [
+            "pozo-septico-guia"
+          ]
+        },
+        {
+          "layout": "cta_banner",
+          "title": "¿Listo para cotizar?",
+          "text": "Cuéntanos fechas, lugar y número de personas.",
+          "cta": {
+            "label": "Cotizar",
+            "href": "/cotizar/"
+          }
+        }
+      ],
+      "faqs": [
+        {
+          "q": "¿Atienden en todo el país?",
+          "a": "Este sitio reúne información y solicitudes para varias ciudades de Colombia; la disponibilidad se confirma en cada cotización según la ubicación."
+        }
+      ],
+      "faq_refs": [
+        "faq-que-incluye-el-alquiler"
+      ],
+      "contentHtml": "<h2>Baños portátiles: cómo elegir</h2>\n<p>Antes de alquilar, define el tipo de uso, la duración y el acceso del vehículo de servicio. Si es una obra, revisa además lo que pide la <a href=\"https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=53565\" target=\"_blank\">Resolución 2400 de 1979</a>.</p>\n<h3>Alquiler o compra</h3>\n<p>Para usos temporales conviene el <a href=\"/alquiler-de-banos-portatiles/\">alquiler de baños portátiles</a>; para usos permanentes, evalúa la compra.</p>"
+    },
+    {
+      "uri": "/alquiler-de-banos-portatiles/",
+      "title": "Alquiler de baños portátiles",
+      "template": "hub-servicio",
+      "order": 10,
+      "excerpt": "Cómo funciona el alquiler de baños portátiles, de qué depende el precio y qué incluye.",
+      "seo": {
+        "title": "Alquiler de baños portátiles | Cotiza en minutos",
+        "description": "Alquiler de baños portátiles para obras y eventos: cómo funciona, de qué depende el precio y qué debe incluir el servicio. Pide tu cotización.",
+        "keyword": "alquiler de baños portátiles",
+        "keywords_secundarias": [
+          "baños portátiles en alquiler"
+        ],
+        "intencion": "transaccional",
+        "noindex": false
+      },
+      "hero": {
+        "eyebrow": "Servicio",
+        "h1": "Alquiler de baños portátiles",
+        "lead": "Todo lo que debe incluir un buen servicio de alquiler.",
+        "bullets": [
+          "Transporte e instalación",
+          "Mantenimiento pactado"
+        ],
+        "cta_primario": {
+          "label": "Cotizar",
+          "href": "/cotizar/"
+        },
+        "mostrar_formulario": false
+      },
+      "sections": [
+        {
+          "layout": "steps",
+          "title": "Cómo funciona el alquiler",
+          "items": [
+            {
+              "title": "Cotiza",
+              "text": "Indica fechas, lugar y número de personas."
+            },
+            {
+              "title": "Instalación",
+              "text": "Se ubican los baños en un punto con acceso para el camión."
+            },
+            {
+              "title": "Retiro",
+              "text": "Al terminar se retiran y se disponen los residuos."
+            }
+          ]
+        },
+        {
+          "layout": "pricing_factors",
+          "title": "¿De qué depende el precio?",
+          "items": [
+            {
+              "factor": "Duración",
+              "detalle": "Días de servicio y número de mantenimientos."
+            },
+            {
+              "factor": "Distancia",
+              "detalle": "Traslado desde la base del proveedor."
+            }
+          ],
+          "disclaimer": "Sin precios de referencia publicados: el valor se confirma en cada cotización."
+        },
+        {
+          "layout": "comparison_table",
+          "title": "Estándar vs. VIP",
+          "columns": [
+            "Característica",
+            "Estándar",
+            "VIP"
+          ],
+          "rows": [
+            [
+              "Lavamanos",
+              "Opcional",
+              "Incluido"
+            ],
+            [
+              "Iluminación",
+              "No",
+              "Según fabricante"
+            ]
+          ],
+          "note": "Las características varían según el fabricante."
+        },
+        {
+          "layout": "contenido"
+        },
+        {
+          "layout": "services_grid",
+          "title": "Ciudades"
+        },
+        {
+          "layout": "callout",
+          "variant": "normativa",
+          "title": "Lo que dice la norma",
+          "text": "En lugares de trabajo se exige **un sanitario por cada 15 trabajadores**.",
+          "source": {
+            "title": "Resolución 2400 de 1979 (Ministerio de Trabajo), art. 17",
+            "url": "https://www.funcionpublica.gov.co/eva/gestornormativo/norma.php?i=53565"
+          }
+        }
+      ],
+      "faqs": [
+        {
+          "q": "¿Con cuánta anticipación debo reservar?",
+          "a": "Depende de la temporada y la cantidad de unidades. Para eventos grandes o fechas festivas conviene cotizar con varias semanas de anticipación."
+        }
+      ],
+      "faq_refs": [
+        "faq-cuantos-banos-por-persona",
+        "faq-cada-cuanto-se-limpia"
+      ],
+      "contentHtml": "<h2>Qué debe incluir el alquiler</h2>\n<ul>\n<li>Transporte, instalación y retiro.</li>\n<li>Mantenimientos pactados por escrito.</li>\n</ul>\n<h2>Qué debe incluir el alquiler</h2>\n<p>Revisa también la <a href=\"https://banosportatiles.net/blog/pozo-septico-guia\">guía de pozos sépticos</a>.</p>\n<p><img src=\"../../assets/images/placeholder-hero.webp\" alt=\"Imagen de ejemplo dentro del contenido\"></p>"
+    },
+    {
+      "uri": "/alquiler-de-banos-portatiles/medellin/",
+      "parentUri": "/alquiler-de-banos-portatiles/",
+      "title": "Alquiler de baños portátiles en Medellín",
+      "template": "ciudad",
+      "order": 20,
+      "ciudad": "medellin",
+      "excerpt": "Alquiler de baños portátiles en Medellín y el Valle de Aburrá.",
+      "seo": {
+        "title": "Alquiler de Baños Portátiles en Medellín | Cotiza",
+        "description": "Alquiler de baños portátiles en Medellín y el Valle de Aburrá para obras y eventos. Revisa accesos, frecuencia de limpieza y pide tu cotización.",
+        "keyword": "alquiler de baños portátiles medellín",
+        "keywords_secundarias": [
+          "baños portátiles medellín"
+        ],
+        "intencion": "transaccional",
+        "noindex": false
+      },
+      "hero": {
+        "eyebrow": "Medellín y Valle de Aburrá",
+        "h1": "Alquiler de baños portátiles en Medellín",
+        "lead": "Lo que conviene revisar antes de alquilar en el Valle de Aburrá.",
+        "bullets": [
+          "Accesos en ladera",
+          "Eventos y obras"
+        ],
+        "image": {
+          "src": "../../../assets/images/placeholder-hero.webp",
+          "alt": "Imagen de ejemplo (placeholder) del seed"
+        },
+        "cta_primario": {
+          "label": "Cotizar en Medellín",
+          "href": "/cotizar/"
+        },
+        "cta_secundario": {
+          "label": "WhatsApp",
+          "href": "whatsapp"
+        },
+        "mostrar_formulario": true
+      },
+      "sections": [
+        {
+          "layout": "contenido"
+        },
+        {
+          "layout": "coverage",
+          "title": "Municipios cercanos",
+          "items": [
+            "medellin"
+          ]
+        },
+        {
+          "layout": "gallery",
+          "title": "Galería de ejemplo",
+          "items": [
+            {
+              "src": "../../../assets/images/placeholder-hero.webp",
+              "alt": "Imagen de ejemplo (placeholder) del seed"
+            }
+          ]
+        }
+      ],
+      "faqs": [
+        {
+          "q": "¿Llegan a zonas de ladera?",
+          "a": "Se confirma en cada caso: el camión de servicio necesita acceso para instalar y hacer la succión. Indica la dirección exacta al cotizar."
+        }
+      ],
+      "contentHtml": "<h2>Baños portátiles en Medellín</h2>\n<p>En el Valle de Aburrá, el acceso del camión es lo primero que se revisa. Vuelve al <a href=\"http://localhost:8080/alquiler-de-banos-portatiles/\">alquiler de baños portátiles</a> para ver cómo funciona el servicio.</p>"
+    },
+    {
+      "uri": "/alquiler-de-banos-portatiles/cali/",
+      "parentUri": "/alquiler-de-banos-portatiles/",
+      "title": "Alquiler de baños portátiles en Cali",
+      "template": "ciudad",
+      "order": 30,
+      "ciudad": "cali",
+      "excerpt": "Alquiler de baños portátiles en Cali y municipios cercanos.",
+      "seo": {
+        "title": "Alquiler de Baños Portátiles en Cali | Cotiza",
+        "description": "Alquiler de baños portátiles en Cali, Jamundí, Palmira y Yumbo para obras y eventos. Conoce qué incluye el servicio y pide tu cotización.",
+        "keyword": "alquiler de baños portátiles cali",
+        "keywords_secundarias": [
+          "baños portátiles cali"
+        ],
+        "intencion": "transaccional",
+        "noindex": false
+      },
+      "hero": {
+        "eyebrow": "Cali y alrededores",
+        "h1": "Alquiler de baños portátiles en Cali",
+        "lead": "Eventos al aire libre y obras con clima cálido todo el año.",
+        "bullets": [
+          "Frecuencia de limpieza",
+          "Lavamanos portátiles"
+        ],
+        "mostrar_formulario": true
+      },
+      "sections": [
+        {
+          "layout": "contenido"
+        },
+        {
+          "layout": "coverage",
+          "title": "Cobertura",
+          "items": [
+            "cali"
+          ]
+        }
+      ],
+      "faqs": [
+        {
+          "q": "¿El calor cambia la frecuencia de limpieza?",
+          "a": "En eventos largos al aire libre suele ser necesario programar más mantenimientos; define la frecuencia en la cotización."
+        }
+      ],
+      "contentHtml": "<h2>Baños portátiles en Cali</h2>\n<p>Con clima cálido todo el año, la frecuencia de limpieza es clave en eventos largos.</p>"
+    }
+  ],
+  "posts": [
+    {
+      "slug": "pozo-septico-guia",
+      "uri": "/blog/pozo-septico-guia/",
+      "title": "Pozo séptico: qué es, cómo funciona y cómo mantenerlo (guía 2026)",
+      "excerpt": "Guía práctica del pozo séptico: funcionamiento, mantenimiento y lo que dice la norma técnica colombiana.",
+      "category": "pozos-septicos",
+      "pillar": true,
+      "pillar_parent": null,
+      "published": "2026-09-22",
+      "modified": "2026-09-22",
+      "author": "Equipo editorial BañosPortátiles.net",
+      "image": {
+        "src": "../../../assets/images/placeholder-hero.webp",
+        "alt": "Imagen de ejemplo (placeholder) del seed"
+      },
+      "seo": {
+        "title": "Pozo séptico: qué es y cómo mantenerlo (guía 2026)",
+        "description": "Qué es un pozo séptico, cómo funciona, cada cuánto se limpia y qué dice la norma (RAS, Resolución 0330 de 2017). Guía práctica para Colombia.",
+        "keyword": "pozo séptico",
+        "keywords_secundarias": [
+          "tanque séptico",
+          "limpieza de pozo séptico"
+        ],
+        "intencion": "informacional"
+      },
+      "key_points": [
+        "Un pozo séptico separa sólidos y trata parcialmente las aguas residuales.",
+        "Necesita vaciado periódico con equipo de succión.",
+        "El diseño se rige por el RAS (Resolución 0330 de 2017)."
+      ],
+      "sources": [
+        {
+          "title": "Resolución 0330 de 2017 (RAS), Ministerio de Vivienda",
+          "url": "https://www.minvivienda.gov.co/sites/default/files/documentos/0330-2017.pdf"
+        }
+      ],
+      "related_services": [
+        "/alquiler-de-banos-portatiles/"
+      ],
+      "related_posts": [],
+      "faqs": [
+        {
+          "q": "¿Cada cuánto se vacía un pozo séptico?",
+          "a": "Depende del volumen del tanque y del número de usuarios. Lo recomendable es inspeccionarlo periódicamente y vaciarlo antes de que los lodos reduzcan la capacidad útil."
+        }
+      ],
+      "contentHtml": "<h2>¿Qué es un pozo séptico?</h2>\n<p>Es un tanque enterrado que recibe las aguas residuales de una vivienda sin conexión al alcantarillado.</p>\n<h3>Cómo funciona</h3>\n<p>Los sólidos se sedimentan y el efluente pasa a un campo de infiltración, según el diseño definido por el <a href=\"https://www.minvivienda.gov.co/sites/default/files/documentos/0330-2017.pdf\">RAS</a>.</p>\n<h2>Mantenimiento</h2>\n<p>Programa inspecciones y vaciados periódicos. Si necesitas baños temporales mientras tanto, revisa el <a href=\"/alquiler-de-banos-portatiles/\">alquiler de baños portátiles</a>.</p>"
+    }
+  ],
+  "equipos": [
+    {
+      "slug": "bano-portatil-estandar",
+      "uri": "/equipos/bano-portatil-estandar/",
+      "title": "Baño portátil estándar",
+      "order": 10,
+      "excerpt": "Cabina individual de polietileno para obras y eventos.",
+      "modalidad": [
+        "alquiler",
+        "venta"
+      ],
+      "specs": [
+        {
+          "k": "Material",
+          "v": "Polietileno de alta densidad (HDPE) con protección UV"
+        },
+        {
+          "k": "Capacidad del tanque",
+          "v": "Según fabricante"
+        }
+      ],
+      "usos": [
+        "Obras",
+        "Eventos"
+      ],
+      "image": {
+        "src": "../../../assets/images/placeholder-hero.webp",
+        "alt": "Imagen de ejemplo (placeholder) del seed"
+      },
+      "gallery": [],
+      "seo": {
+        "title": "Baño portátil estándar | Alquiler y venta",
+        "description": "Baño portátil estándar de polietileno para obras y eventos: características típicas, usos y modalidades de alquiler o venta.",
+        "keyword": "baño portátil estándar"
+      },
+      "faqs": [
+        {
+          "q": "¿Trae lavamanos?",
+          "a": "El modelo estándar normalmente no lo trae integrado; se puede agregar un lavamanos portátil independiente."
+        }
+      ],
+      "contentHtml": "<h2>Características</h2>\n<p>Cabina individual con inodoro, orinal y ventilación. Las medidas y la capacidad varían según el fabricante.</p>"
+    }
+  ]
+}

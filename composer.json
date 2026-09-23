@@ -1,0 +1,46 @@
+{
+    "name": "connexis/banosportatiles-cms",
+    "description": "Headless WordPress backend for banosportatiles.net (plugin bp-headless). Composer is dev-only: the plugin has no runtime dependencies.",
+    "type": "project",
+    "license": "GPL-2.0-or-later",
+    "require": {
+        "php": ">=8.3"
+    },
+    "autoload-dev": {
+        "psr-4": {
+            "BanosPortatiles\\Headless\\": "wp-content/plugins/bp-headless/src/",
+            "BanosPortatiles\\Headless\\Tests\\": "tests/"
+        }
+    },
+    "scripts": {
+        "test": "pest",
+        "lint": "pint --test",
+        "format": "pint",
+        "analyse": "phpstan analyse --memory-limit=1G --no-progress",
+        "check": [
+            "@lint",
+            "@analyse",
+            "@test"
+        ]
+    },
+    "config": {
+        "sort-packages": true,
+        "platform": {
+            "php": "8.3.99"
+        },
+        "allow-plugins": {
+            "pestphp/pest-plugin": true
+        }
+    },
+    "minimum-stability": "stable",
+    "prefer-stable": true,
+    "require-dev": {
+        "brain/monkey": "^2.7",
+        "laravel/pint": "^1.32",
+        "pestphp/pest": "^4.7",
+        "php-stubs/acf-pro-stubs": "^6.8",
+        "php-stubs/wp-cli-stubs": "^2.12",
+        "phpstan/phpstan": "^2.2",
+        "szepeviktor/phpstan-wordpress": "^2.0"
+    }
+}

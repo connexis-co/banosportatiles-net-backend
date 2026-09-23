@@ -1,0 +1,33 @@
+# Fallback for hosts where Docker cannot bind-mount this folder (macOS privacy/TCC on ~/Documents).
+# bin/setup.sh enables it automatically via COMPOSE_FILE in backend/.env; sources are pushed with bin/sync.sh.
+# Grant Docker Desktop access to the Documents folder and re-run bin/setup.sh to go back to live bind mounts.
+x-sync-volumes: &sync-volumes
+  - wp_data:/var/www/html
+  - bp_plugin:/var/www/html/wp-content/plugins/bp-headless
+  - bp_theme:/var/www/html/wp-content/themes/bp-headless-theme
+
+services:
+  wordpress:
+    volumes: *sync-volumes
+  cron:
+    volumes: *sync-volumes
+  wpcli:
+    volumes:
+      - wp_data:/var/www/html
+      - bp_plugin:/var/www/html/wp-content/plugins/bp-headless
+      - bp_theme:/var/www/html/wp-content/themes/bp-headless-theme
+      - bp_bin:/opt/bp/bin
+      - bp_seed:/opt/bp/seed
+      - bp_dist:/opt/bp/dist
+      - bp_sink:/opt/bp/sink
+  hook-sink:
+    volumes:
+      - bp_sink:/sink
+
+volumes:
+  bp_plugin:
+  bp_theme:
+  bp_bin:
+  bp_seed:
+  bp_dist:
+  bp_sink:
