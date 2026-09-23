@@ -28,6 +28,12 @@ final class PublicConfig
         }
         // Invariant for every consumer: no number, no WhatsApp button (also before the first save).
         $config['show_whatsapp'] = (bool) $config['show_whatsapp'] && is_string($config['whatsapp_number']) && $config['whatsapp_number'] !== '';
+        // Placements are stored as a list; consumers get an explicit object {placement: bool} (same shape as the seed).
+        $enabled = is_array($config['placements']) ? $config['placements'] : [];
+        $config['placements'] = [];
+        foreach (array_keys(Defaults::PLACEMENTS) as $placement) {
+            $config['placements'][$placement] = in_array($placement, $enabled, true);
+        }
         $config['version'] = substr(md5((string) json_encode($config)), 0, 12);
 
         return $config;

@@ -102,7 +102,14 @@ final class Sanitizer
         }
 
         $placements = $has('placements') ? $input['placements'] : ($partial ? $current['placements'] : []);
-        $placements = is_string($placements) ? explode(',', $placements) : (is_array($placements) ? $placements : []);
+        if (is_string($placements)) {
+            $placements = explode(',', $placements);
+        } elseif (is_array($placements) && ! array_is_list($placements)) {
+            // Object form {top_bar: true, …} (seed bundle / frontend): keep the enabled keys.
+            $placements = array_keys(array_filter($placements, static fn (mixed $on): bool => filter_var($on, FILTER_VALIDATE_BOOLEAN)));
+        } elseif (! is_array($placements)) {
+            $placements = [];
+        }
         $placements = array_map(static fn (mixed $p): string => is_scalar($p) ? trim((string) $p) : '', $placements);
         $settings['placements'] = array_values(array_intersect(array_keys(Defaults::PLACEMENTS), $placements));
 
