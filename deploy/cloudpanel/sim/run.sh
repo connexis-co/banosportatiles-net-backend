@@ -75,6 +75,7 @@ check "tema bp-headless-theme, es_CO, America/Bogota, noindex, /%postname%/" "[[
 check "sin contenido de ejemplo" "[[ -z \$(simwp post list --post_type=post,page --name=hola-mundo --format=ids) ]]"
 check "API bp/v1/site responde" "[[ \$(simwp eval 'echo rest_do_request(new WP_REST_Request(\"GET\", \"/bp/v1/site\"))->get_status();') == 200 ]]"
 check "bp-venta/v1/config es el mismo objeto que /site → sale_banner" venta_same_object
+check "/site → seo.siteName es la marca del seed, no el título del CMS" "[[ \$(simwp eval 'echo rest_do_request(new WP_REST_Request(\"GET\", \"/bp/v1/site\"))->get_data()[\"seo\"][\"siteName\"];') == 'BañosPortátiles.net' ]]"
 check "cron real en el crontab del usuario del sitio" "docker exec bp-sim crontab -u bp-sim-cms -l | grep -q 'cron event run --due-now'"
 check "certificado solicitado con clpctl lets-encrypt:install:certificate" "docker exec bp-sim grep -q 'lets-encrypt:install:certificate' /var/lib/clp-sim/calls.log"
 
