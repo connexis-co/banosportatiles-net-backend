@@ -4,6 +4,7 @@
 #   deploy/cloudpanel/deploy.sh --dry-run      # prints every command (secrets masked); touches nothing
 #   deploy/cloudpanel/deploy.sh                # deploys to $SSH_HOST (default: connexis-prod)
 #   deploy/cloudpanel/deploy.sh --seed=<dir>   # also imports <dir>/bundle.json (+ <dir>/assets)
+#   deploy/cloudpanel/deploy.sh --seed=<dir> --seed-force   # rewrites every seed item (after importer changes)
 #   deploy/cloudpanel/deploy.sh --skip-cert    # skips Let's Encrypt (e.g. DNS not ready yet)
 #
 # Configuration and secrets: backend/.env.deploy (gitignored, chmod 600). It is created on the first real
@@ -16,6 +17,7 @@ BACKEND_DIR="$(cd "$SCRIPT_DIR/../.." && pwd -P)"
 ENV_FILE="$BACKEND_DIR/.env.deploy"
 DRY_RUN=0
 OPT_SKIP_CERT=0
+OPT_SEED_FORCE=0
 SEED_DIR=""
 
 for arg in "$@"; do
@@ -23,8 +25,9 @@ for arg in "$@"; do
     --dry-run) DRY_RUN=1 ;;
     --skip-cert) OPT_SKIP_CERT=1 ;;
     --seed=*) SEED_DIR="${arg#--seed=}" ;;
+    --seed-force) OPT_SEED_FORCE=1 ;;
     --env-file=*) ENV_FILE="${arg#--env-file=}" ;;
-    -h|--help) sed -n '2,10p' "$0"; exit 0 ;;
+    -h|--help) sed -n '2,11p' "$0"; exit 0 ;;
     *) echo "Opción desconocida: $arg (usa --help)" >&2; exit 2 ;;
   esac
 done
@@ -36,7 +39,7 @@ die() { printf '\033[1;31m✘ %s\033[0m\n' "$*" >&2; exit 1; }
 SECRETS=(SITE_USER_PASSWORD DB_PASSWORD WP_ADMIN_PASSWORD BP_LEADS_SECRET BP_PREVIEW_SECRET)
 PUBLIC_VARS=(CMS_DOMAIN FRONTEND_URL PHP_VERSION SITE_USER DB_NAME DB_USER VHOST_TEMPLATE WP_TITLE WP_ADMIN_USER
   WP_ADMIN_EMAIL WP_LOCALE WP_TIMEZONE WP_TABLE_PREFIX BP_LEADS_EMAIL BP_LEADS_EMAIL_TO BP_LEADS_EMAIL_CC BP_DEPLOY_HOOK_URL BP_CORS_ORIGINS
-  BP_LEADS_WEBHOOK_URL BP_SMTP_HOST BP_SMTP_PORT BP_SMTP_USER BP_SMTP_FROM BP_SMTP_FROM_NAME SKIP_CERT STAGE_DIR)
+  BP_LEADS_WEBHOOK_URL BP_SMTP_HOST BP_SMTP_PORT BP_SMTP_USER BP_SMTP_FROM BP_SMTP_FROM_NAME SKIP_CERT SEED_FORCE STAGE_DIR)
 
 # --- 1. Configuration: ONLY backend/.env.deploy → defaults -------------------------------------------
 # Same-named variables of the calling shell are discarded on purpose: backend/.env (local Docker) uses
@@ -45,6 +48,7 @@ for var in SSH_HOST SERVER_IP "${PUBLIC_VARS[@]}" "${SECRETS[@]}" BP_SMTP_PASS; 
   unset "$var"
 done
 SKIP_CERT="$OPT_SKIP_CERT"
+SEED_FORCE="$OPT_SEED_FORCE"
 if [[ -f "$ENV_FILE" ]]; then
   set -a
   # shellcheck disable=SC1090
@@ -122,6 +126,8 @@ done
 if [[ -n "$SEED_DIR" ]]; then
   SEED_DIR="$(cd "$SEED_DIR" 2>/dev/null && pwd -P)" || die "--seed: la carpeta no existe."
   [[ -f "$SEED_DIR/bundle.json" ]] || die "--seed: falta $SEED_DIR/bundle.json."
+elif [[ "$SEED_FORCE" == "1" ]]; then
+  die "--seed-force requiere --seed=<carpeta del bundle>."
 fi
 if [[ -z "$BP_SMTP_USER" || -z "$BP_SMTP_PASS" ]]; then
   warn "Sin BP_SMTP_USER/BP_SMTP_PASS (Brevo) en $(basename "$ENV_FILE"): el CMS no tendrá SMTP hasta completarlos y volver a desplegar."

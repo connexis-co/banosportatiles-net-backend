@@ -263,11 +263,11 @@ PHP
     rm -rf "$PRIVATE_DIR/seed"
     cp -a "$STAGE_DIR/seed" "$PRIVATE_DIR/seed"
     chown -R "$SITE_USER:$SITE_USER" "$PRIVATE_DIR/seed"
-    if [[ -d "$PRIVATE_DIR/seed/assets" ]]; then
-      wp bp import-seed "$PRIVATE_DIR/seed/bundle.json" --assets="$PRIVATE_DIR/seed/assets" --no-deploy
-    else
-      wp bp import-seed "$PRIVATE_DIR/seed/bundle.json" --no-deploy
-    fi
+    import_args=(--no-deploy)
+    [[ -d "$PRIVATE_DIR/seed/assets" ]] && import_args+=(--assets="$PRIVATE_DIR/seed/assets")
+    # --seed-force: rewrite unchanged items too (e.g. after the importer learned new fields).
+    [[ "${SEED_FORCE:-0}" == "1" ]] && import_args+=(--force)
+    wp bp import-seed "$PRIVATE_DIR/seed/bundle.json" "${import_args[@]}"
     rm -rf "$PRIVATE_DIR/seed"
   fi
   ok "limpio"
