@@ -491,13 +491,17 @@ final class FieldValueMapper
     {
         $title = ['title' => Arr::string($section, 'title')];
         $intro = ['intro' => Arr::string($section, 'intro')];
+        $head = $title + ['anchor' => Arr::string($section, 'anchor')] + $intro;
+        $image = ['image' => $this->image($section['image'] ?? null)];
 
         return match ($layout) {
             'contenido' => [],
-            'features_grid' => $title + $intro + ['items' => self::rows($section, ['icon', 'title', 'text'])],
-            'steps' => $title + $intro + ['items' => self::rows($section, ['title', 'text'])],
-            'pricing_factors' => $title + $intro + ['items' => self::rows($section, ['factor', 'detalle']), 'disclaimer' => Arr::string($section, 'disclaimer')],
-            'comparison_table' => $title + $intro + [
+            'faq' => $head,
+            'rich_text' => $head + ['text' => Arr::string($section, 'text')] + $image + ['image_position' => self::imagePosition(Arr::string($section, 'image_position'))],
+            'features_grid' => $head + $image + ['items' => $this->itemRows($section, ['icon', 'title', 'text'], true)],
+            'steps' => $head + $image + ['items' => $this->itemRows($section, ['title', 'text'], true)],
+            'pricing_factors' => $head + $image + ['items' => self::rows($section, ['factor', 'detalle']), 'disclaimer' => Arr::string($section, 'disclaimer')],
+            'comparison_table' => $head + [
                 'columns' => array_map(static fn (string $label): array => ['label' => $label], Arr::strings($section, 'columns')),
                 'rows' => array_map(
                     static fn (mixed $row): array => ['cells' => array_map(
@@ -508,22 +512,62 @@ final class FieldValueMapper
                 ),
                 'note' => Arr::string($section, 'note'),
             ],
-            'equipment_grid' => $title + $intro + ['items' => $this->ids(Arr::strings($section, 'items'), $this->lookup->equipoId(...), 'equipo')],
-            'services_grid' => $title + $intro + ['items' => $this->ids(Arr::strings($section, 'items'), $this->lookup->pageId(...), 'servicio')],
-            'coverage' => $title + $intro + ['items' => $this->ids(Arr::strings($section, 'items'), $this->lookup->ciudadId(...), 'ciudad')],
-            'related_posts' => $title + $intro + ['items' => $this->ids(Arr::strings($section, 'items'), $this->lookup->postId(...), 'post')],
+            'equipment_grid' => $head + ['items' => $this->ids(Arr::strings($section, 'items'), $this->lookup->equipoId(...), 'equipo')],
+            'services_grid' => $head + ['items' => $this->ids(Arr::strings($section, 'items'), $this->lookup->pageId(...), 'servicio')],
+            'coverage' => $head + ['items' => $this->ids(Arr::strings($section, 'items'), $this->lookup->ciudadId(...), 'ciudad')],
+            'related_posts' => $head + ['items' => $this->ids(Arr::strings($section, 'items'), $this->lookup->postId(...), 'post')],
             'callout' => [
                 'variant' => Arr::string($section, 'variant') ?: 'info',
                 'title' => Arr::string($section, 'title'),
                 'text' => Arr::string($section, 'text'),
                 'source' => ['title' => Arr::string(Arr::array($section, 'source'), 'title'), 'url' => Arr::string(Arr::array($section, 'source'), 'url')],
             ],
-            'cta_banner' => $title + ['text' => Arr::string($section, 'text'), 'cta' => self::link(Arr::array($section, 'cta'))],
-            'gallery' => $title + $intro + ['items' => array_values(array_filter(array_map(
+            'cta_banner' => $title + ['anchor' => Arr::string($section, 'anchor'), 'text' => Arr::string($section, 'text'), 'cta' => self::link(Arr::array($section, 'cta'))] + $image,
+            'gallery' => $head + ['items' => array_values(array_filter(array_map(
                 $this->lookup->imageId(...),
                 array_values(Arr::array($section, 'items'))
             )))],
             default => null,
+        };
+    }
+
+    /** Image descriptor ({src, alt} or path) → attachment id, or "" (no image). */
+    private function image(mixed $image): int|string
+    {
+        return ($image === null || $image === '' || $image === []) ? '' : ($this->lookup->imageId($image) ?? '');
+    }
+
+    /**
+     * Repeater rows of a block, with an optional image per row (steps, features_grid).
+     *
+     * @param  array<array-key, mixed>  $data
+     * @param  list<string>  $keys
+     * @return list<array<string, int|string>>
+     */
+    private function itemRows(array $data, array $keys, bool $withImage): array
+    {
+        $rows = [];
+        foreach (Arr::rows($data, 'items') as $item) {
+            $row = [];
+            foreach ($keys as $key) {
+                $row[$key] = Arr::string($item, $key);
+            }
+            if ($withImage) {
+                $row['image'] = $this->image($item['image'] ?? null);
+            }
+            $rows[] = $row;
+        }
+
+        return $rows;
+    }
+
+    /** "left" | "right" (also «izquierda» / «derecha»); anything else → "" (the front's default). */
+    private static function imagePosition(string $value): string
+    {
+        return match (strtolower($value)) {
+            'left', 'izquierda' => 'left',
+            'right', 'derecha' => 'right',
+            default => '',
         };
     }
 

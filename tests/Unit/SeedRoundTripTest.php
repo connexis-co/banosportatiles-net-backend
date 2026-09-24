@@ -65,9 +65,42 @@ it('maps gallery images to attachment IDs and reports unknown references', funct
     ]);
 
     expect($rows)->toBe([
-        ['acf_fc_layout' => 'gallery', 'title' => 'Fotos', 'intro' => '', 'items' => [900]],
-        ['acf_fc_layout' => 'equipment_grid', 'title' => '', 'intro' => '', 'items' => []],
+        ['acf_fc_layout' => 'gallery', 'title' => 'Fotos', 'anchor' => '', 'intro' => '', 'items' => [900]],
+        ['acf_fc_layout' => 'equipment_grid', 'title' => '', 'anchor' => '', 'intro' => '', 'items' => []],
     ])->and($warnings)->toHaveCount(2);
+});
+
+it('round-trips section images, item images, anchors, rich_text and the faq marker', function (): void {
+    $mapper = new FieldValueMapper(new FakeSeedLookup);
+    $refs = new FakeReferenceResolver(images: [900 => ['src' => 'https://cms/x.webp', 'width' => 1200, 'height' => 800, 'alt' => 'Foto']]);
+    $photo = ['src' => 'images/generated/pasos.jpg', 'alt' => 'Foto'];
+
+    $api = (new SectionsNormalizer($refs))->normalize($mapper->sections([
+        ['layout' => 'steps', 'title' => 'Cómo funciona', 'anchor' => '#Cómo funciona', 'image' => $photo, 'items' => [
+            ['title' => 'Cotiza', 'text' => 'Cuéntanos', 'image' => $photo],
+            ['title' => 'Instalamos', 'text' => ''],
+        ]],
+        ['layout' => 'features_grid', 'title' => 'Beneficios', 'items' => [['icon' => 'truck', 'title' => 'Logística', 'image' => $photo]]],
+        ['layout' => 'rich_text', 'title' => 'Qué incluye', 'text' => 'Texto **Markdown**.', 'image' => $photo, 'image_position' => 'izquierda'],
+        ['layout' => 'rich_text', 'title' => 'Sin foto', 'text' => 'Solo texto.', 'image_position' => 'arriba'],
+        ['layout' => 'pricing_factors', 'title' => 'Precio', 'image' => $photo, 'items' => [['factor' => 'Días', 'detalle' => 'Duración']]],
+        ['layout' => 'cta_banner', 'title' => 'Cotiza', 'text' => 'Hoy', 'cta' => ['label' => 'Ir', 'href' => '/cotizar/'], 'image' => $photo],
+        ['layout' => 'faq', 'title' => 'Preguntas frecuentes', 'anchor' => 'preguntas-frecuentes'],
+    ]));
+    $image = $refs->images[900];
+
+    expect($api)->toBe([
+        ['layout' => 'steps', 'title' => 'Cómo funciona', 'anchor' => 'como-funciona', 'image' => $image, 'items' => [
+            ['title' => 'Cotiza', 'text' => 'Cuéntanos', 'image' => $image],
+            ['title' => 'Instalamos'],
+        ]],
+        ['layout' => 'features_grid', 'title' => 'Beneficios', 'items' => [['icon' => 'truck', 'title' => 'Logística', 'image' => $image]]],
+        ['layout' => 'rich_text', 'title' => 'Qué incluye', 'text' => 'Texto **Markdown**.', 'image' => $image, 'image_position' => 'left'],
+        ['layout' => 'rich_text', 'title' => 'Sin foto', 'text' => 'Solo texto.'],
+        ['layout' => 'pricing_factors', 'title' => 'Precio', 'image' => $image, 'items' => [['factor' => 'Días', 'detalle' => 'Duración']]],
+        ['layout' => 'cta_banner', 'title' => 'Cotiza', 'text' => 'Hoy', 'cta' => ['label' => 'Ir', 'href' => '/cotizar/'], 'image' => $image],
+        ['layout' => 'faq', 'title' => 'Preguntas frecuentes', 'anchor' => 'preguntas-frecuentes'],
+    ]);
 });
 
 it('maps site.yaml to the options page groups', function (): void {

@@ -175,32 +175,46 @@ final class FieldGroups
     public static function sections(): array
     {
         $f = new FieldBuilder;
-        $title = static fn (FieldBuilder $b): array => $b->text('title', 'Título (H2)');
+        // Every block with an H2: title + stable anchor (TOC and deep links) + optional intro.
+        $head = static fn (FieldBuilder $b, bool $intro = true): array => [
+            $b->text('title', 'Título (H2)'),
+            $b->text('anchor', 'Ancla', ['instructions' => 'Opcional: id estable del H2 para la tabla de contenidos y los enlaces (a-z, 0-9 y guiones). Vacío = se calcula del título.']),
+            ...($intro ? [$b->textarea('intro', 'Introducción')] : []),
+        ];
+        $image = static fn (FieldBuilder $b, string $label = 'Imagen del bloque'): array => $b->image('image', $label, ['instructions' => 'Opcional. El texto alternativo sale del campo «Texto alternativo» del medio.']);
 
         $layouts = [
             'features_grid' => ['label' => 'Grid de beneficios', 'fields' => static fn (FieldBuilder $l): array => [
-                $title($l),
-                $l->textarea('intro', 'Introducción'),
+                ...$head($l),
+                $image($l),
                 $l->repeater('items', 'Elementos', static fn (FieldBuilder $i): array => [
                     $i->text('icon', 'Icono', ['instructions' => 'Nombre de lucide (truck, shield-check…).']),
                     $i->text('title', 'Título'),
                     $i->textarea('text', 'Texto'),
+                    $image($i, 'Imagen'),
                 ], ['layout' => 'block']),
             ]],
             'contenido' => ['label' => 'Contenido del editor', 'fields' => static fn (FieldBuilder $l): array => [
                 $l->message('info', 'Contenido principal', 'Marca el lugar donde se muestra el contenido del editor de la página.'),
             ]],
+            'rich_text' => ['label' => 'Texto con imagen', 'fields' => static fn (FieldBuilder $l): array => [
+                ...$head($l),
+                $l->textarea('text', 'Texto (Markdown)', ['rows' => 8, 'instructions' => 'Párrafos, **negritas**, listas y [enlaces](/ruta/).']),
+                $image($l, 'Imagen'),
+                $l->select('image_position', 'Lado de la imagen', ['left' => 'Izquierda', 'right' => 'Derecha'], ['allow_null' => 1, 'instructions' => 'Vacío = derecha.']),
+            ]],
             'steps' => ['label' => 'Pasos', 'fields' => static fn (FieldBuilder $l): array => [
-                $title($l),
-                $l->textarea('intro', 'Introducción'),
+                ...$head($l),
+                $image($l),
                 $l->repeater('items', 'Pasos', static fn (FieldBuilder $i): array => [
                     $i->text('title', 'Título'),
                     $i->textarea('text', 'Texto'),
+                    $image($i, 'Imagen'),
                 ], ['layout' => 'block']),
             ]],
             'pricing_factors' => ['label' => 'Factores de precio', 'fields' => static fn (FieldBuilder $l): array => [
-                $title($l),
-                $l->textarea('intro', 'Introducción'),
+                ...$head($l),
+                $image($l),
                 $l->repeater('items', 'Factores', static fn (FieldBuilder $i): array => [
                     $i->text('factor', 'Factor'),
                     $i->textarea('detalle', 'Detalle'),
@@ -208,8 +222,7 @@ final class FieldGroups
                 $l->text('disclaimer', 'Aviso', ['instructions' => 'Fecha y fuente de los precios de referencia.']),
             ]],
             'comparison_table' => ['label' => 'Tabla comparativa', 'fields' => static fn (FieldBuilder $l): array => [
-                $title($l),
-                $l->textarea('intro', 'Introducción'),
+                ...$head($l),
                 $l->repeater('columns', 'Columnas', static fn (FieldBuilder $c): array => [
                     $c->text('label', 'Encabezado'),
                 ]),
@@ -221,23 +234,20 @@ final class FieldGroups
                 $l->textarea('note', 'Nota'),
             ]],
             'equipment_grid' => ['label' => 'Grid de equipos', 'fields' => static fn (FieldBuilder $l): array => [
-                $title($l),
-                $l->textarea('intro', 'Introducción'),
+                ...$head($l),
                 $l->relationship('items', 'Equipos', [PostTypes::EQUIPO]),
             ]],
             'services_grid' => ['label' => 'Grid de servicios', 'fields' => static fn (FieldBuilder $l): array => [
-                $title($l),
-                $l->textarea('intro', 'Introducción'),
+                ...$head($l),
                 $l->relationship('items', 'Páginas', ['page'], ['instructions' => 'Vacío = páginas hijas.']),
             ]],
             'coverage' => ['label' => 'Cobertura', 'fields' => static fn (FieldBuilder $l): array => [
-                $title($l),
-                $l->textarea('intro', 'Introducción'),
+                ...$head($l),
                 $l->taxonomy('items', 'Ciudades', Taxonomies::CIUDAD, ['instructions' => 'Vacío = todas.']),
             ]],
             'callout' => ['label' => 'Destacado', 'fields' => static fn (FieldBuilder $l): array => [
                 $l->select('variant', 'Variante', self::CALLOUT_VARIANTS, ['default_value' => 'info']),
-                $title($l),
+                $l->text('title', 'Título (H2)'),
                 $l->textarea('text', 'Texto (Markdown corto)', ['rows' => 4]),
                 $l->group('source', 'Fuente', static fn (FieldBuilder $s): array => [
                     $s->text('title', 'Título de la fuente'),
@@ -245,24 +255,27 @@ final class FieldGroups
                 ]),
             ]],
             'related_posts' => ['label' => 'Guías relacionadas', 'fields' => static fn (FieldBuilder $l): array => [
-                $title($l),
-                $l->textarea('intro', 'Introducción'),
+                ...$head($l),
                 $l->relationship('items', 'Posts', ['post']),
             ]],
             'cta_banner' => ['label' => 'Banner CTA', 'fields' => static fn (FieldBuilder $l): array => [
-                $title($l),
+                ...$head($l, false),
                 $l->textarea('text', 'Texto'),
                 self::cta($l, 'cta', 'CTA'),
+                $image($l, 'Imagen de fondo o lateral'),
             ]],
             'gallery' => ['label' => 'Galería', 'fields' => static fn (FieldBuilder $l): array => [
-                $title($l),
-                $l->textarea('intro', 'Introducción'),
+                ...$head($l),
                 $l->gallery('items', 'Imágenes'),
+            ]],
+            'faq' => ['label' => 'Preguntas frecuentes (posición)', 'fields' => static fn (FieldBuilder $l): array => [
+                ...$head($l),
+                $l->message('info', 'Preguntas frecuentes', 'Marca el lugar donde se muestran las preguntas frecuentes de la página.'),
             ]],
         ];
 
         return self::group('sections', 'Secciones', self::postTypes(['page']), [
-            $f->flexible('sections', 'Secciones', $layouts, ['instructions' => 'Bloques en orden. «Contenido del editor» marca dónde va el cuerpo.']),
+            $f->flexible('sections', 'Secciones', $layouts, ['instructions' => 'Bloques en orden. «Contenido del editor» y «Preguntas frecuentes» marcan dónde van el cuerpo y las FAQ.']),
         ], ['menu_order' => 1]);
     }
 

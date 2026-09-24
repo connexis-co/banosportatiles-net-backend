@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace BanosPortatiles\Headless\Normalizer;
 
+use BanosPortatiles\Headless\Html\Slugger;
 use BanosPortatiles\Headless\Support\Arr;
 
 /**
@@ -13,9 +14,11 @@ use BanosPortatiles\Headless\Support\Arr;
 final class SectionsNormalizer
 {
     public const LAYOUTS = [
-        'features_grid', 'contenido', 'steps', 'pricing_factors', 'comparison_table', 'equipment_grid',
-        'services_grid', 'coverage', 'callout', 'related_posts', 'cta_banner', 'gallery',
+        'features_grid', 'contenido', 'rich_text', 'steps', 'pricing_factors', 'comparison_table', 'equipment_grid',
+        'services_grid', 'coverage', 'callout', 'related_posts', 'cta_banner', 'gallery', 'faq',
     ];
+
+    public const IMAGE_POSITIONS = ['left', 'right'];
 
     public function __construct(private readonly ReferenceResolver $refs) {}
 
@@ -49,13 +52,17 @@ final class SectionsNormalizer
      */
     private function fields(string $layout, array $row): ?array
     {
-        $head = Arr::withoutEmpty(['title' => Arr::string($row, 'title'), 'intro' => Arr::string($row, 'intro')]);
+        $head = Arr::withoutEmpty(['title' => Arr::string($row, 'title'), 'anchor' => self::anchor($row), 'intro' => Arr::string($row, 'intro')]);
+        $image = Arr::withoutEmpty(['image' => $this->image($row)]);
 
         return match ($layout) {
             'contenido' => [],
-            'features_grid' => $head + ['items' => $this->items($row, ['icon', 'title', 'text'])],
-            'steps' => $head + ['items' => $this->items($row, ['title', 'text'])],
-            'pricing_factors' => $head + ['items' => $this->items($row, ['factor', 'detalle'])]
+            'faq' => $head,
+            'rich_text' => $head + Arr::withoutEmpty(['text' => Arr::string($row, 'text')]) + $image
+                + Arr::withoutEmpty(['image_position' => in_array(Arr::string($row, 'image_position'), self::IMAGE_POSITIONS, true) ? Arr::string($row, 'image_position') : '']),
+            'features_grid' => $head + $image + ['items' => $this->items($row, ['icon', 'title', 'text'], true)],
+            'steps' => $head + $image + ['items' => $this->items($row, ['title', 'text'], true)],
+            'pricing_factors' => $head + $image + ['items' => $this->items($row, ['factor', 'detalle'])]
                 + Arr::withoutEmpty(['disclaimer' => Arr::string($row, 'disclaimer')]),
             'comparison_table' => $head + ['columns' => Arr::strings($row, 'columns', 'label'), 'rows' => $this->tableRows($row)]
                 + Arr::withoutEmpty(['note' => Arr::string($row, 'note')]),
@@ -64,7 +71,7 @@ final class SectionsNormalizer
             'coverage' => $head + ['items' => $this->resolve(Arr::ids($row['items'] ?? null), $this->refs->termSlug(...))],
             'callout' => ['variant' => Arr::string($row, 'variant') ?: 'info'] + $head
                 + Arr::withoutEmpty(['text' => Arr::string($row, 'text'), 'source' => $this->source(Arr::array($row, 'source'))]),
-            'cta_banner' => $head + Arr::withoutEmpty(['text' => Arr::string($row, 'text'), 'cta' => self::link(Arr::array($row, 'cta'))]),
+            'cta_banner' => $head + Arr::withoutEmpty(['text' => Arr::string($row, 'text'), 'cta' => self::link(Arr::array($row, 'cta'))]) + $image,
             'gallery' => $head + ['items' => $this->resolve(Arr::ids($row['items'] ?? null), $this->refs->image(...))],
             default => null,
         };
@@ -87,7 +94,7 @@ final class SectionsNormalizer
      * @param  list<string>  $keys
      * @return list<array<string, mixed>>
      */
-    private function items(array $row, array $keys): array
+    private function items(array $row, array $keys, bool $withImage = false): array
     {
         $items = [];
         foreach (Arr::rows($row, 'items') as $item) {
@@ -97,11 +104,32 @@ final class SectionsNormalizer
             }
             $values = Arr::withoutEmpty($values);
             if ($values !== []) {
-                $items[] = $values;
+                $items[] = $values + ($withImage ? Arr::withoutEmpty(['image' => $this->image($item)]) : []);
             }
         }
 
         return $items;
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $row
+     * @return array{src: string, width: int, height: int, alt: string}|null
+     */
+    private function image(array $row): ?array
+    {
+        $id = Arr::ids($row['image'] ?? null)[0] ?? 0;
+
+        return $id > 0 ? $this->refs->image($id) : null;
+    }
+
+    /**
+     * Stable id of the H2, as an ASCII slug ("#¿Cuánto cuesta?" → "cuanto-cuesta").
+     *
+     * @param  array<array-key, mixed>  $row
+     */
+    private static function anchor(array $row): string
+    {
+        return Slugger::slugify(ltrim(Arr::string($row, 'anchor'), '#'));
     }
 
     /**

@@ -7,13 +7,17 @@ namespace BanosPortatiles\Headless\Import;
 use BanosPortatiles\Headless\Support\Arr;
 
 /**
- * Sideloads seed images into the media library, deduplicated by content hash (local files) or URL.
- * Local "src" values are resolved against --assets: relative prefixes (../, ./, /), common roots
- * (src/assets/, assets/, public/) and, as a last resort, the file name anywhere inside the folder.
+ * Sideloads seed images into the media library, deduplicated by content hash (local files: meta
+ * _bp_source_sha1) or URL (remote files). Local "src" values are resolved against --assets: relative prefixes
+ * (../, ./, /), common roots (src/assets/, assets/, public/; e.g. images/generated/x.jpg) and, as a last resort,
+ * the file name anywhere inside the folder. The alt text of the seed is written to the attachment.
  */
 final class MediaImporter
 {
+    /** "sha1:<hash>" or "url:<url>" (kept for attachments imported before _bp_source_sha1 existed). */
     public const SOURCE_META = '_bp_seed_source';
+
+    public const SHA1_META = '_bp_source_sha1';
 
     /** @var array<string, int> */
     private array $cache = [];
@@ -42,12 +46,20 @@ final class MediaImporter
             return null;
         }
 
-        $sourceKey = $isRemote ? 'url:'.$src : 'sha1:'.sha1_file((string) $path);
-        $existing = $this->cache[$sourceKey] ?? $this->findBySource($sourceKey);
+        $sha1 = $isRemote ? '' : (string) sha1_file((string) $path);
+        $sourceKey = $isRemote ? 'url:'.$src : 'sha1:'.$sha1;
+        $existing = $this->cache[$sourceKey]
+            ?? ($sha1 !== '' ? $this->findBy(self::SHA1_META, $sha1) : null)
+            ?? $this->findBy(self::SOURCE_META, $sourceKey);
         if ($existing !== null) {
             $this->cache[$sourceKey] = $existing;
-            if ($alt !== '' && ! $this->dryRun) {
-                update_post_meta($existing, '_wp_attachment_image_alt', $alt);
+            if (! $this->dryRun) {
+                if ($sha1 !== '') {
+                    update_post_meta($existing, self::SHA1_META, $sha1);
+                }
+                if ($alt !== '') {
+                    update_post_meta($existing, '_wp_attachment_image_alt', $alt);
+                }
             }
             $this->report->count('media', 'unchanged');
 
@@ -66,6 +78,9 @@ final class MediaImporter
         }
 
         update_post_meta($id, self::SOURCE_META, $sourceKey);
+        if ($sha1 !== '') {
+            update_post_meta($id, self::SHA1_META, $sha1);
+        }
         if ($alt !== '') {
             update_post_meta($id, '_wp_attachment_image_alt', $alt);
         }
@@ -144,13 +159,13 @@ final class MediaImporter
         return $id;
     }
 
-    private function findBySource(string $sourceKey): ?int
+    private function findBy(string $metaKey, string $value): ?int
     {
         $ids = get_posts([
             'post_type' => 'attachment',
             'post_status' => 'inherit',
-            'meta_key' => self::SOURCE_META,
-            'meta_value' => $sourceKey,
+            'meta_key' => $metaKey,
+            'meta_value' => $value,
             'fields' => 'ids',
             'numberposts' => 1,
             'no_found_rows' => true,
