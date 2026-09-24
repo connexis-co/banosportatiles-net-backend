@@ -4,6 +4,7 @@ declare(strict_types=1);
 
 namespace BanosPortatiles\Headless\Import;
 
+use BanosPortatiles\Headless\Normalizer\PriceNormalizer;
 use BanosPortatiles\Headless\Routing\UriResolver;
 use BanosPortatiles\Headless\Support\Arr;
 
@@ -174,6 +175,57 @@ final class FieldValueMapper
             'usos' => self::textRows(Arr::strings($item, 'usos')),
             'gallery' => $gallery,
         ];
+    }
+
+    /**
+     * Seed "price" (snake_case or camelCase keys) → SCF group "price"; null when the item has no price.
+     * The seed carries no prices today: this only keeps the importer ready (and lossless) for when it does.
+     *
+     * @param  array<array-key, mixed>  $item
+     * @return array<string, mixed>|null
+     */
+    public function price(array $item): ?array
+    {
+        if (! isset($item['price']) || ! is_array($item['price'])) {
+            return null;
+        }
+        $price = $item['price'];
+        $pick = static fn (string $snake, string $camel): string => Arr::string($price, $snake) ?: Arr::string($price, $camel);
+        $unit = Arr::string($price, 'unit');
+        if (is_array($price['unit'] ?? null)) {
+            $code = Arr::string($price['unit'], 'code');
+            $unit = $code === 'C62' && str_contains(Arr::string($price['unit'], 'label'), 'unidad') ? 'C62_unidad' : $code;
+        }
+        if ($unit !== '' && ! isset(PriceNormalizer::UNITS[$unit])) {
+            ($this->warn)(sprintf('Precio: unidad desconocida «%s» (se omite).', $unit));
+            $unit = '';
+        }
+
+        return [
+            'show' => Arr::bool($price, 'show', true) ? 1 : 0,
+            'mode' => Arr::string($price, 'mode') ?: 'from',
+            'amount' => PriceNormalizer::amount($price['amount'] ?? null) ?? '',
+            'min' => PriceNormalizer::amount($price['min'] ?? null) ?? '',
+            'max' => PriceNormalizer::amount($price['max'] ?? null) ?? '',
+            'unit' => $unit,
+            'tax_included' => (array_key_exists('tax_included', $price) ? Arr::bool($price, 'tax_included') : Arr::bool($price, 'taxIncluded')) ? 1 : 0,
+            'valid_until' => PriceNormalizer::date($pick('valid_until', 'validUntil')) ?? '',
+            'updated' => PriceNormalizer::date(Arr::string($price, 'updated')) ?? '',
+            'note' => Arr::string($price, 'note'),
+            'availability' => isset(PriceNormalizer::AVAILABILITY[Arr::string($price, 'availability')]) ? Arr::string($price, 'availability') : 'InStock',
+        ];
+    }
+
+    /**
+     * Seed "schema_type" / "schemaType" → SCF value; null when absent (the importer then keeps the current value).
+     *
+     * @param  array<array-key, mixed>  $item
+     */
+    public function schemaType(array $item): ?string
+    {
+        $value = Arr::string($item, 'schema_type') ?: Arr::string($item, 'schemaType');
+
+        return $value === '' ? null : PriceNormalizer::schemaType($value);
     }
 
     /**

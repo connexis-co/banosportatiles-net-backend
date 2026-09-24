@@ -6,6 +6,7 @@ namespace BanosPortatiles\Headless\Fields;
 
 use BanosPortatiles\Headless\Content\PostTypes;
 use BanosPortatiles\Headless\Content\Taxonomies;
+use BanosPortatiles\Headless\Normalizer\PriceNormalizer;
 use BanosPortatiles\Headless\Reviews\RatingPolicy;
 
 /**
@@ -29,6 +30,7 @@ final class FieldGroups
             self::hero(),
             self::sections(),
             self::faqs(),
+            self::price(),
             self::blog(),
             self::equipo(),
             self::seo(),
@@ -56,6 +58,49 @@ final class FieldGroups
                 $s->image('og_image', 'Imagen para redes (Open Graph)', ['instructions' => '1200 × 630 px.']),
             ]),
         ], ['menu_order' => 90]);
+    }
+
+    /**
+     * «Precio» (hub-servicio, servicio and ciudad pages and equipos) and the schema type of the page. Prices are
+     * set by the owner: the seed never carries them.
+     *
+     * @return array<string, mixed>
+     */
+    public static function price(): array
+    {
+        $f = new FieldBuilder;
+        $location = [
+            ...array_map(static fn (string $template): array => [['param' => 'page_template', 'operator' => '==', 'value' => $template]], ['hub-servicio', 'servicio', 'ciudad']),
+            [['param' => 'post_type', 'operator' => '==', 'value' => PostTypes::EQUIPO]],
+        ];
+
+        return self::group('price', 'Precio y datos estructurados', $location, [
+            $f->group('price', 'Precio de referencia', static function (FieldBuilder $p): array {
+                $shown = ['field' => $p->key('show'), 'operator' => '==', 'value' => '1'];
+                $range = ['field' => $p->key('mode'), 'operator' => '==', 'value' => 'range'];
+                $single = ['field' => $p->key('mode'), 'operator' => '!=', 'value' => 'range'];
+
+                return [
+                    $p->trueFalse('show', 'Mostrar precio', [
+                        'instructions' => 'Solo con precios reales confirmados por la empresa. Apagado, la página no muestra precio ni lo publica en los datos estructurados (Offer).',
+                    ]),
+                    $p->select('mode', 'Tipo de precio', PriceNormalizer::MODES, ['default_value' => 'from', 'conditional_logic' => [[$shown]]]),
+                    $p->number('amount', 'Valor en COP', ['min' => 1, 'step' => 1, 'prepend' => '$', 'append' => 'COP', 'instructions' => 'Número entero, sin puntos ni decimales.', 'conditional_logic' => [[$shown, $single]]]),
+                    $p->number('min', 'Mínimo en COP', ['min' => 1, 'step' => 1, 'prepend' => '$', 'append' => 'COP', 'conditional_logic' => [[$shown, $range]]]),
+                    $p->number('max', 'Máximo en COP', ['min' => 1, 'step' => 1, 'prepend' => '$', 'append' => 'COP', 'instructions' => 'Mayor que el mínimo.', 'conditional_logic' => [[$shown, $range]]]),
+                    $p->select('unit', 'Unidad', PriceNormalizer::unitChoices(), ['allow_null' => 1, 'conditional_logic' => [[$shown]]]),
+                    $p->trueFalse('tax_included', 'IVA incluido', ['conditional_logic' => [[$shown]]]),
+                    $p->field('date_picker', 'valid_until', 'Vigente hasta', ['display_format' => 'd/m/Y', 'return_format' => 'Y-m-d', 'first_day' => 1, 'conditional_logic' => [[$shown]]]),
+                    $p->field('date_picker', 'updated', 'Fecha de revisión del precio', ['display_format' => 'd/m/Y', 'return_format' => 'Y-m-d', 'first_day' => 1, 'instructions' => 'Cuándo confirmó la empresa este precio (se muestra al visitante).', 'conditional_logic' => [[$shown]]]),
+                    $p->text('note', 'Nota bajo el precio', ['maxlength' => PriceNormalizer::MAX_NOTE, 'instructions' => 'P. ej. «Incluye transporte en el área metropolitana».', 'conditional_logic' => [[$shown]]]),
+                    $p->select('availability', 'Disponibilidad', PriceNormalizer::AVAILABILITY, ['default_value' => 'InStock', 'conditional_logic' => [[$shown]]]),
+                ];
+            }),
+            $f->select('schema_type', 'Tipo de datos estructurados', PriceNormalizer::SCHEMA_TYPES, [
+                'default_value' => 'auto',
+                'instructions' => 'Automático recomendado: Google muestra estrellas y precio para Product, no para Service.',
+            ]),
+        ], ['menu_order' => 3]);
     }
 
     /**

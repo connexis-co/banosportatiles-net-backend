@@ -474,7 +474,8 @@ final class SeedImporter implements SeedLookup
     }
 
     /**
-     * Featured image, SEO and inline FAQs (shared by pages, posts and equipos).
+     * Featured image, SEO and inline FAQs (shared by pages, posts and equipos). Price and schema type are written
+     * only when the seed item declares them: otherwise the values set by the owner in WordPress are kept.
      *
      * @param  array<array-key, mixed>  $item
      */
@@ -487,6 +488,15 @@ final class SeedImporter implements SeedLookup
         $root = new FieldBuilder;
         update_field($root->key('seo'), $this->mapper->seo(Arr::array($item, 'seo')), $id);
         update_field($root->key('faqs'), $this->mapper->faqs($item), $id);
+
+        $price = $this->mapper->price($item);
+        if ($price !== null) {
+            update_field($root->key('price'), $price, $id);
+        }
+        $schemaType = $this->mapper->schemaType($item);
+        if ($schemaType !== null) {
+            update_field($root->key('schema_type'), $schemaType, $id);
+        }
     }
 
     /**

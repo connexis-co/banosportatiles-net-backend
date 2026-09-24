@@ -96,6 +96,13 @@ final class NodeNormalizer
         if ($type === PostTypes::EQUIPO) {
             $node['equipo'] = $this->equipo($id);
         }
+        // Price and schema type only on service, city and equipo nodes (stale values of other templates are ignored).
+        $supportsPrice = PriceNormalizer::supports($node['template']);
+        $price = $supportsPrice ? PriceNormalizer::normalize($this->fields->get('price', $id)) : null;
+        if ($price !== null) {
+            $node['price'] = $price;
+        }
+        $node['schemaType'] = $supportsPrice ? PriceNormalizer::schemaType($this->fields->get('schema_type', $id)) : 'auto';
         // "rating" and "reviews" only when this node has ratings (Site Reviews active + policy).
         $node += $this->ratings->forNode($post);
         if ($preview) {
