@@ -71,7 +71,7 @@ it('normalizes a review with initials, plain text and the owner response, never 
         'initials' => 'AP',
         'rating' => 5,
         'title' => 'Muy útil',
-        'content' => "Primer párrafo.\n\nSegundo xpárrafo.",
+        'content' => "Primer párrafo.\n\nSegundo párrafo.",
         'date' => '2026-09-20T10:00:00-05:00',
         'response' => ['content' => "Gracias.\n\nSaludos.", 'date' => '2026-09-21T08:00:00-05:00', 'author' => 'BañosPortátiles.net'],
     ])->and(json_encode($review))->not->toContain('203.0.113.9')
@@ -157,4 +157,27 @@ it('matches the blacklist like Site Reviews (case-insensitive substrings, one pe
         ->and(Blacklist::matches($entries, '198.51.100.7'))->toBeTrue()
         ->and(Blacklist::matches($entries, 'Opinión normal 203.0.113.5'))->toBeFalse()
         ->and(Blacklist::matches('', 'algo'))->toBeFalse();
+});
+
+it('turns review and response HTML into plain text with line breaks', function (string $html, string $text): void {
+    expect(ReviewNormalizer::plainText($html))->toBe($text);
+})->with([
+    'br' => ['Gracias por comentar.<br>Saludos.', "Gracias por comentar.\nSaludos."],
+    'br variants' => ['Uno<br/>Dos<BR />Tres', "Uno\nDos\nTres"],
+    'paragraphs' => ['<p>Gracias por comentar.</p><p>Saludos.</p>', "Gracias por comentar.\n\nSaludos."],
+    'entities' => ['Baños &amp; lavamanos &lt;3 &quot;VIP&quot;', 'Baños & lavamanos <3 "VIP"'],
+    'windows newlines' => ["Línea 1\r\nLínea 2\r\n\r\n\r\n\r\nLínea 3", "Línea 1\nLínea 2\n\nLínea 3"],
+    'other html' => ['<strong>Muy</strong> <a href="https://x.co">bien</a><script>alert(1)</script>', 'Muy bien'],
+]);
+
+it('keeps paragraphs and line breaks in the owner response stored by Site Reviews', function (): void {
+    $allowed = BanosPortatiles\Headless\Reviews\ReviewsWriteGuard::allowParagraphs(['a' => ['href' => true], 'strong' => []]);
+
+    expect($allowed)->toHaveKeys(['a', 'strong', 'p', 'br'])
+        ->and(BanosPortatiles\Headless\Reviews\ReviewsWriteGuard::allowParagraphs(null))->toBe(['p' => [], 'br' => []]);
+
+    $review = ReviewNormalizer::normalize(new ReviewRecord(3, 4, 'Ana', '', "Primera línea\nSegunda línea", true, new DateTimeImmutable('2026-09-20'), response: '<p>Gracias por comentar.</p><p>Saludos.</p>'), 'Marca');
+
+    expect($review['content'])->toBe("Primera línea\nSegunda línea")
+        ->and($review['response']['content'])->toBe("Gracias por comentar.\n\nSaludos.");
 });

@@ -66,6 +66,7 @@ final class ReviewNormalizer
     /** HTML or text → plain text that keeps paragraphs and line breaks. */
     public static function plainText(string $text): string
     {
+        $text = (string) preg_replace('#<(script|style)\b[^>]*>.*?</\1\s*>#is', '', $text);
         $text = (string) preg_replace('#<br\s*/?>#i', "\n", $text);
         $text = (string) preg_replace('#</(p|div|li|h[1-6])>#i', "\n\n", $text);
         $text = html_entity_decode(strip_tags($text), ENT_QUOTES | ENT_HTML5, 'UTF-8');

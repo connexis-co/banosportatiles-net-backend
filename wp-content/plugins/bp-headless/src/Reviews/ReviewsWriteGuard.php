@@ -39,6 +39,20 @@ final class ReviewsWriteGuard implements Hookable
         add_filter('site-reviews/schema/all', '__return_empty_array');
         // An empty avatar URL makes Site Reviews use its local fallback instead of checking Gravatar over HTTP.
         add_filter('site-reviews/avatar/generate', '__return_empty_string');
+        // Owner responses keep their paragraphs and line breaks (Site Reviews would strip <p>/<br> without a
+        // newline); the API turns them into plain text with line breaks.
+        add_filter('site-reviews/sanitize/allowed-html', [self::class, 'allowParagraphs']);
+    }
+
+    /**
+     * @param  array<string, mixed>  $allowed
+     * @return array<string, mixed>
+     */
+    public static function allowParagraphs(mixed $allowed): array
+    {
+        $allowed = is_array($allowed) ? $allowed : [];
+
+        return $allowed + ['p' => [], 'br' => []];
     }
 
     /**
