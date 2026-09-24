@@ -14,7 +14,8 @@ use BanosPortatiles\Headless\Seo\RankMathSeoWriter;
 use BanosPortatiles\Headless\Support\Arr;
 
 /**
- * Idempotent seed import (upsert by "_bp_seed_key"; unchanged items are skipped by content hash).
+ * Idempotent seed import (upsert by "_bp_seed_key"; unchanged items are skipped by content hash, which
+ * includes the SHA-1 of the local images they reference, so an image replaced in place is picked up).
  *
  * Pass 1: site options → ciudades → categorías → FAQs → redirects → equipos → posts → pages (by depth).
  * Pass 2: relations that need every object to exist (sections, FAQ refs, blog relations, category pillars).
@@ -47,6 +48,8 @@ final class SeedImporter implements SeedLookup
 
     private MediaImporter $media;
 
+    private AssetFingerprint $assets;
+
     private FieldValueMapper $mapper;
 
     private bool $dryRun = false;
@@ -60,6 +63,7 @@ final class SeedImporter implements SeedLookup
     ) {
         $this->report = new ImportReport;
         $this->media = new MediaImporter(null, true, $this->report);
+        $this->assets = new AssetFingerprint($this->media->resolveLocal(...));
         $this->mapper = new FieldValueMapper($this);
     }
 
@@ -74,6 +78,7 @@ final class SeedImporter implements SeedLookup
         $this->dryRun = $dryRun;
         $this->force = $force;
         $this->media = new MediaImporter($assetsDir, $dryRun, $report);
+        $this->assets = new AssetFingerprint($this->media->resolveLocal(...));
         $this->mapper = new FieldValueMapper($this, $report->warn(...));
         $this->pages = $this->posts = $this->equipos = $this->faqs = $this->ciudades = $this->categories = [];
 
@@ -198,7 +203,7 @@ final class SeedImporter implements SeedLookup
         if ($site === []) {
             return;
         }
-        $hash = md5(serialize($site));
+        $hash = $this->assets->hash($site);
         if (! $this->force && get_option('bp_headless_seed_site_hash') === $hash) {
             $this->report->count('ajustes', 'unchanged');
 
@@ -434,7 +439,7 @@ final class SeedImporter implements SeedLookup
             default => $type,
         };
         $existing = $this->findBySeedKey($type, $seedKey) ?? $fallbackId;
-        $hash = md5(serialize($item));
+        $hash = $this->assets->hash($item);
 
         if ($existing !== null && ! $this->force && get_post_meta($existing, self::SEED_HASH, true) === $hash) {
             $this->report->count($entity, 'unchanged');
@@ -578,7 +583,7 @@ final class SeedImporter implements SeedLookup
     {
         $slug = Arr::string($item, 'slug');
         $name = Arr::string($item, 'name');
-        $hash = md5(serialize($item));
+        $hash = $this->assets->hash($item);
         $existing = get_term_by('slug', $slug, $taxonomy);
 
         if ($existing instanceof \WP_Term && ! $this->force && get_term_meta($existing->term_id, self::SEED_HASH, true) === $hash) {
