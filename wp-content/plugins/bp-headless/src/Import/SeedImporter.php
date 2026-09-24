@@ -476,8 +476,8 @@ final class SeedImporter implements SeedLookup
     }
 
     /**
-     * Featured image, SEO and inline FAQs (shared by pages, posts and equipos). Price, schema type and TOC are
-     * written only when the seed item declares them: otherwise the values set in WordPress are kept.
+     * Featured image, SEO and inline FAQs (shared by pages, posts and equipos). Price, schema type, TOC and the
+     * rating override are written only when the seed item declares them: otherwise WordPress keeps its values.
      *
      * @param  array<array-key, mixed>  $item
      */
@@ -504,6 +504,10 @@ final class SeedImporter implements SeedLookup
         $toc = $this->mapper->toc($item);
         if ($toc !== null) {
             update_field($root->key('toc'), $toc, $id);
+        }
+        $ratings = $this->mapper->ratings($item);
+        if ($ratings !== null) {
+            update_field($root->key('ratings'), $ratings, $id);
         }
     }
 

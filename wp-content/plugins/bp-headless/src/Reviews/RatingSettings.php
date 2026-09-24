@@ -37,6 +37,7 @@ final readonly class RatingSettings
     public const TEXT_FIELDS = [
         'starsTitle' => 'stars_title',
         'starsHelp' => 'stars_help',
+        'firstVote' => 'first_vote',
         'thanks' => 'thanks',
         'reviewsTitle' => 'reviews_title',
         'reviewsEmpty' => 'reviews_empty',
@@ -45,16 +46,17 @@ final readonly class RatingSettings
         'pending' => 'pending',
     ];
 
-    /** @var array<string, string> UI texts (neutral: no claims about the service). */
+    /** @var array<string, string> UI texts (same defaults as the seed, site.yaml → ratings.texts). */
     public const DEFAULT_TEXTS = [
         'starsTitle' => 'Califica esta página',
-        'starsHelp' => 'Elige de 1 a 5 estrellas. Contamos un voto por persona.',
-        'thanks' => '¡Gracias por tu calificación!',
-        'reviewsTitle' => 'Opiniones',
-        'reviewsEmpty' => 'Aún no hay opiniones. Sé el primero en calificar.',
-        'formTitle' => 'Deja tu opinión',
-        'consent' => 'Acepto la política de tratamiento de datos personales (Ley 1581 de 2012).',
-        'pending' => 'Gracias. Publicaremos tu opinión cuando la revisemos.',
+        'starsHelp' => 'Elige de 1 a 5 estrellas.',
+        'firstVote' => 'Sé el primero en calificar',
+        'thanks' => '¡Gracias! Registramos tu calificación.',
+        'reviewsTitle' => 'Comentarios',
+        'reviewsEmpty' => 'Todavía no hay comentarios. Cuéntanos tu experiencia o tu duda.',
+        'formTitle' => 'Deja tu comentario',
+        'consent' => 'Autorizo el tratamiento de mis datos personales para publicar y moderar mi comentario, conforme a la Ley 1581 de 2012.',
+        'pending' => 'Recibimos tu comentario. Lo publicaremos cuando lo revisemos.',
     ];
 
     /**

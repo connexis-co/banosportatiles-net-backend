@@ -22,6 +22,9 @@ final class FieldGroups
 
     public const MODALIDADES = ['alquiler' => 'Alquiler', 'venta' => 'Venta'];
 
+    /** Regions of the cities (menu and /cobertura/ group them in this order). */
+    public const REGIONS = ['Caribe', 'Antioquia y Eje Cafetero', 'Centro y Santanderes', 'Pacífico y sur', 'Llanos Orientales'];
+
     /**
      * @return list<array<string, mixed>>
      */
@@ -324,6 +327,7 @@ final class FieldGroups
 
         return self::group('ciudad', 'Datos de la ciudad', [[['param' => 'taxonomy', 'operator' => '==', 'value' => Taxonomies::CIUDAD]]], [
             $f->text('departamento', 'Departamento'),
+            $f->select('region', 'Región', array_combine(self::REGIONS, self::REGIONS), ['allow_null' => 1, 'instructions' => 'Agrupa la ciudad en el menú y en la página de cobertura.']),
             $f->text('autoridad_ambiental', 'Autoridad ambiental', ['instructions' => 'CAR o autoridad ambiental urbana que regula vertimientos y residuos en la ciudad (p. ej. AMVA, DAGMA, CAR).']),
             $f->number('lat', 'Latitud', ['step' => 'any']),
             $f->number('lng', 'Longitud', ['step' => 'any']),

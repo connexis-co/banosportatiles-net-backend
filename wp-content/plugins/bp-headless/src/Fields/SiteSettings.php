@@ -18,6 +18,16 @@ final class SiteSettings
 
     public const DEPLOY_HOOK_FIELD = 'field_bp_site_deploy_hook_url';
 
+    /** Top-level menu items: manual children or a submenu built by the front from the content. */
+    public const MENU_KINDS = [
+        'links' => 'Enlaces del submenú (manuales)',
+        'ciudades' => 'Ciudades por región (automático; los enlaces manuales son destacados)',
+        'servicios' => 'Servicios (automático; los enlaces manuales son destacados)',
+        'blog' => 'Blog: categorías y guías (automático; los enlaces manuales son destacados)',
+    ];
+
+    public const HEADER_DEFAULTS = ['cta_label' => 'Solicitar cotización', 'cta_short' => 'Cotizar', 'cta_href' => '/cotizar/'];
+
     public const SOCIAL_NETWORKS = [
         'facebook' => 'Facebook', 'instagram' => 'Instagram', 'tiktok' => 'TikTok',
         'youtube' => 'YouTube', 'linkedin' => 'LinkedIn', 'x' => 'X',
@@ -62,7 +72,8 @@ final class SiteSettings
             $f->group('brand', 'Marca', static fn (FieldBuilder $b): array => [
                 $b->text('name', 'Nombre', ['default_value' => 'BañosPortátiles.net']),
                 $b->text('tagline', 'Lema'),
-                $b->image('logo', 'Logo'),
+                $b->image('logo', 'Logo', ['instructions' => 'SVG recomendado (Safe SVG lo sanea al subirlo y la API lo entrega en línea, máx. 100 KB). PNG o WebP también sirven. Vacío = el logo del sitio.']),
+                $b->image('logo_dark', 'Logo para fondos oscuros', ['instructions' => 'Opcional (pie de página y barras oscuras). Mismas reglas que el logo.']),
             ]),
             $f->group('contact', 'Contacto', static fn (FieldBuilder $c): array => [
                 $c->text('whatsapp', 'WhatsApp', ['instructions' => 'Formato internacional: +57…']),
@@ -80,6 +91,7 @@ final class SiteSettings
                 $l->text('responsable', 'Responsable (nombre visible)'),
                 $l->text('razon_social', 'Razón social'),
                 $l->text('nit', 'NIT'),
+                $l->text('telefono', 'Teléfono del responsable', ['instructions' => 'Solo se muestra en las páginas legales.']),
                 $l->text('direccion', 'Dirección'),
                 $l->text('ciudad', 'Ciudad'),
                 $l->email('email_datos', 'Email para datos personales'),
@@ -97,15 +109,35 @@ final class SiteSettings
             ]),
 
             $f->tab('tab_menus', 'Menús'),
+            $f->group('header', 'Botón de la cabecera', static fn (FieldBuilder $h): array => [
+                $h->text('cta_label', 'Texto', ['default_value' => self::HEADER_DEFAULTS['cta_label']]),
+                $h->text('cta_short', 'Texto corto (móvil)', ['default_value' => self::HEADER_DEFAULTS['cta_short']]),
+                $h->text('cta_href', 'Enlace', ['default_value' => self::HEADER_DEFAULTS['cta_href']]),
+            ], ['layout' => 'row', 'instructions' => 'Botón fijo de la cabecera y del menú móvil (no va como elemento del menú).']),
             $f->group('menus', 'Menús', static fn (FieldBuilder $m): array => [
                 $m->repeater('header', 'Menú principal', static fn (FieldBuilder $h): array => [
                     ...$menuLink($h),
-                    $h->repeater('children', 'Submenú', $menuLink),
+                    $h->text('icon', 'Icono', ['instructions' => 'Nombre de Lucide (toilet, map-pinned…). Vacío = el front lo deduce.']),
+                    $h->select('kind', 'Submenú', self::MENU_KINDS, ['default_value' => 'links']),
+                    $h->repeater('children', 'Submenú', static fn (FieldBuilder $c): array => [
+                        ...$menuLink($c),
+                        $c->text('icon', 'Icono'),
+                        $c->text('group', 'Grupo', ['instructions' => 'Encabezado que agrupa enlaces seguidos (p. ej. «Pozos y tanques sépticos»).']),
+                    ], ['layout' => 'block']),
                 ], ['layout' => 'block', 'button_label' => 'Añadir elemento']),
+                $m->repeater('secondary', 'Enlaces secundarios', static fn (FieldBuilder $l): array => [
+                    ...$link($l),
+                    $l->text('icon', 'Icono'),
+                ], ['instructions' => 'Nosotros, preguntas frecuentes, contacto…: pie del menú móvil y barra superior en escritorio.', 'button_label' => 'Añadir enlace']),
                 $m->repeater('footer', 'Footer (columnas)', static fn (FieldBuilder $c): array => [
                     $c->text('title', 'Título de la columna'),
                     $c->repeater('links', 'Enlaces', $link),
                 ], ['layout' => 'block', 'button_label' => 'Añadir columna']),
+            ]),
+
+            $f->tab('tab_microcopy', 'Textos globales'),
+            $f->group('microcopy', 'Textos globales', self::microcopyFields(...), [
+                'instructions' => 'Textos de conversión que se repiten en el sitio. Vacío = el texto por defecto del sitio.',
             ]),
 
             $f->tab('tab_ratings', 'Valoraciones'),
@@ -123,6 +155,7 @@ final class SiteSettings
                 $t->text('title', 'Título', ['default_value' => TocResolver::DEFAULT_TITLE]),
                 $t->text('title_blog', 'Título en el blog', ['default_value' => TocResolver::DEFAULT_TITLE_BLOG]),
                 $t->select('depth', 'Niveles', ['2' => 'Solo H2', '3' => 'H2 y H3'], ['default_value' => (string) TocResolver::DEFAULT_DEPTH]),
+                $t->select('depth_blog', 'Niveles en el blog', ['2' => 'Solo H2', '3' => 'H2 y H3'], ['allow_null' => 1, 'instructions' => 'Vacío = los mismos niveles que el resto del sitio.']),
                 $t->number('min', 'Mínimo de encabezados para mostrarla', ['default_value' => TocResolver::DEFAULT_MIN, 'min' => 1, 'step' => 1]),
                 $t->trueFalse('numbered', 'Numerada'),
                 $t->trueFalse('collapsed_mobile', 'Cerrada por defecto en móvil', ['default_value' => 1]),
@@ -145,6 +178,32 @@ final class SiteSettings
                 ]),
             ]),
         ], ['style' => 'seamless']);
+    }
+
+    /**
+     * «Textos globales» (/site → microcopy): CTAs and conversion texts repeated across the site.
+     *
+     * @return list<array<string, mixed>>
+     */
+    private static function microcopyFields(FieldBuilder $m): array
+    {
+        $cta = static fn (FieldBuilder $c): array => [
+            $c->text('title', 'Título'),
+            $c->textarea('text', 'Texto', ['rows' => 2]),
+            $c->text('label', 'Texto del botón'),
+        ];
+
+        return [
+            $m->group('cta_banner', 'CTA al final de las páginas comerciales', $cta),
+            $m->text('aside_title', 'Tarjeta lateral de cotización: título'),
+            $m->repeater('aside_bullets', 'Tarjeta lateral de cotización: viñetas', static fn (FieldBuilder $b): array => [
+                $b->text('text', 'Viñeta'),
+            ], ['max' => 5, 'button_label' => 'Añadir viñeta']),
+            $m->text('aside_label', 'Tarjeta lateral de cotización: botón'),
+            $m->text('mega_footer', 'Franja inferior del mega-menú'),
+            $m->group('blog_cta', 'CTA de las guías del blog', $cta),
+            $m->group('equipo_cta', 'CTA de las fichas de equipos', $cta, ['instructions' => 'Admite {equipo}: el nombre del equipo en minúsculas.']),
+        ];
     }
 
     /**
@@ -186,6 +245,7 @@ final class SiteSettings
             $r->group('texts', 'Textos de la interfaz', static fn (FieldBuilder $x): array => [
                 $x->text('stars_title', 'Título del bloque de estrellas', ['default_value' => RatingSettings::DEFAULT_TEXTS['starsTitle']]),
                 $x->text('stars_help', 'Ayuda bajo las estrellas', ['default_value' => RatingSettings::DEFAULT_TEXTS['starsHelp']]),
+                $x->text('first_vote', 'Texto sin votos todavía', ['default_value' => RatingSettings::DEFAULT_TEXTS['firstVote']]),
                 $x->text('thanks', 'Mensaje después de votar', ['default_value' => RatingSettings::DEFAULT_TEXTS['thanks']]),
                 $x->text('reviews_title', 'Título de las opiniones', ['default_value' => RatingSettings::DEFAULT_TEXTS['reviewsTitle']]),
                 $x->text('reviews_empty', 'Texto cuando aún no hay opiniones', ['default_value' => RatingSettings::DEFAULT_TEXTS['reviewsEmpty']]),

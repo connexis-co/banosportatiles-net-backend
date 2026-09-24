@@ -33,7 +33,7 @@ final class TocResolver
         'venta-sitio' => 'Sitio en venta',
     ];
 
-    public const DEFAULT_TYPES = ['hub-servicio', 'servicio', 'ciudad', 'post', 'legal'];
+    public const DEFAULT_TYPES = ['hub-servicio', 'servicio', 'ciudad', 'landing', 'legal', 'post'];
 
     public const DEFAULT_TITLE = 'En esta página';
 
@@ -48,7 +48,9 @@ final class TocResolver
     /**
      * /site → toc.
      *
-     * @return array{enabled_types: list<string>, title: string, titleBlog: string, depth: int, min: int, numbered: bool, collapsedMobile: bool, sticky: bool}
+     * depthBlog (extension of the front: levels of blog posts) is present only when set.
+     *
+     * @return array<string, mixed>
      */
     public static function site(mixed $global): array
     {
@@ -58,12 +60,14 @@ final class TocResolver
             ? array_values(array_intersect(Arr::strings($global, 'enabled_types'), array_keys(self::TYPES)))
             : self::DEFAULT_TYPES;
         $min = Arr::int($global, 'min', self::DEFAULT_MIN);
+        $depthBlog = self::depth($global['depth_blog'] ?? null);
 
         return [
             'enabled_types' => $types,
             'title' => Arr::string($global, 'title') ?: self::DEFAULT_TITLE,
             'titleBlog' => Arr::string($global, 'title_blog') ?: self::DEFAULT_TITLE_BLOG,
             'depth' => self::depth($global['depth'] ?? null) ?? self::DEFAULT_DEPTH,
+        ] + ($depthBlog !== null ? ['depthBlog' => $depthBlog] : []) + [
             'min' => $min >= 1 ? $min : self::DEFAULT_MIN,
             'numbered' => Arr::bool($global, 'numbered'),
             'collapsedMobile' => Arr::bool($global, 'collapsed_mobile', true),
@@ -90,7 +94,7 @@ final class TocResolver
         return [
             'enabled' => $enabled,
             'title' => Arr::string($local, 'title') ?: ($template === 'post' ? $site['titleBlog'] : $site['title']),
-            'depth' => self::depth($local['depth'] ?? null) ?? $site['depth'],
+            'depth' => self::depth($local['depth'] ?? null) ?? ($template === 'post' ? ($site['depthBlog'] ?? $site['depth']) : $site['depth']),
             'min' => $site['min'],
             'numbered' => $site['numbered'],
             'collapsedMobile' => $site['collapsedMobile'],

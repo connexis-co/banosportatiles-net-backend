@@ -4,8 +4,11 @@ declare(strict_types=1);
 
 namespace BanosPortatiles\Headless\Import;
 
+use BanosPortatiles\Headless\Fields\FieldGroups;
+use BanosPortatiles\Headless\Fields\SiteSettings;
 use BanosPortatiles\Headless\Normalizer\PriceNormalizer;
 use BanosPortatiles\Headless\Normalizer\TocResolver;
+use BanosPortatiles\Headless\Reviews\RatingSettings;
 use BanosPortatiles\Headless\Routing\UriResolver;
 use BanosPortatiles\Headless\Support\Arr;
 
@@ -270,8 +273,15 @@ final class FieldValueMapper
      */
     public function ciudad(array $ciudad): array
     {
+        $region = Arr::string($ciudad, 'region');
+        if ($region !== '' && ! in_array($region, FieldGroups::REGIONS, true)) {
+            ($this->warn)(sprintf('Ciudad %s: región desconocida «%s» (se omite).', Arr::string($ciudad, 'slug'), $region));
+            $region = '';
+        }
+
         return [
             'departamento' => Arr::string($ciudad, 'departamento'),
+            'region' => $region,
             'autoridad_ambiental' => Arr::string($ciudad, 'autoridad_ambiental'),
             'lat' => Arr::float($ciudad, 'lat') ?? '',
             'lng' => Arr::float($ciudad, 'lng') ?? '',
@@ -291,8 +301,9 @@ final class FieldValueMapper
     {
         $groups = [
             'brand' => ['name', 'tagline'],
+            'header' => ['cta_label', 'cta_short', 'cta_href'],
             'contact' => ['whatsapp', 'phone', 'email', 'horario'],
-            'legal' => ['responsable', 'razon_social', 'nit', 'direccion', 'ciudad', 'email_datos'],
+            'legal' => ['responsable', 'razon_social', 'nit', 'telefono', 'direccion', 'ciudad', 'email_datos'],
             'analytics' => ['ga4', 'gtm'],
             'forms' => ['turnstile_site_key', 'leads_email', 'leads_webhook_url'],
         ];
@@ -309,8 +320,11 @@ final class FieldValueMapper
             }
         }
 
-        if (isset($site['brand']) && is_array($site['brand']) && ($site['brand']['logo'] ?? '') !== '') {
-            $values['brand']['logo'] = $this->lookup->imageId($site['brand']['logo']) ?? '';
+        foreach (['logo', 'logo_dark'] as $logo) {
+            if (isset($site['brand']) && is_array($site['brand']) && array_key_exists($logo, $site['brand'])) {
+                $image = $site['brand'][$logo];
+                $values['brand'][$logo] = ($image !== null && $image !== '') ? ($this->lookup->imageId($image) ?? '') : '';
+            }
         }
         if (isset($site['social']) && is_array($site['social'])) {
             $values['social'] = array_map(static fn (array $row): array => [
@@ -319,19 +333,154 @@ final class FieldValueMapper
             ], Arr::rows($site, 'social'));
         }
         if (isset($site['menus']) && is_array($site['menus'])) {
-            $menus = $site['menus'];
-            $values['menus'] = [
-                'header' => array_map(static fn (array $item): array => self::menuLink($item) + [
-                    'children' => array_map(self::menuLink(...), Arr::rows($item, 'children')),
-                ], Arr::rows($menus, 'header')),
-                'footer' => array_map(static fn (array $column): array => [
-                    'title' => Arr::string($column, 'title'),
-                    'links' => array_map(self::link(...), Arr::rows($column, 'links')),
-                ], Arr::rows($menus, 'footer')),
-            ];
+            $values['menus'] = $this->menus($site['menus']);
+        }
+        if (isset($site['microcopy']) && is_array($site['microcopy'])) {
+            $values['microcopy'] = self::microcopy($site['microcopy']);
+        }
+        if (isset($site['ratings']) && is_array($site['ratings'])) {
+            $values['ratings'] = self::ratingsSettings($site['ratings']);
+        }
+        if (isset($site['toc']) && is_array($site['toc'])) {
+            $values['toc'] = $this->tocSettings($site['toc']);
         }
 
         return $values;
+    }
+
+    /**
+     * Seed "rating" of a page/post/equipo → SCF group "ratings" (per-post override); null when absent.
+     * `rating: false` turns stars and reviews off; {stars?, reviews?} sets each one (missing = inherit).
+     *
+     * @param  array<array-key, mixed>  $item
+     * @return array{stars: string, reviews: string}|null
+     */
+    public function ratings(array $item): ?array
+    {
+        if (! array_key_exists('rating', $item)) {
+            return null;
+        }
+        $rating = $item['rating'];
+        if ($rating === false) {
+            return ['stars' => 'no', 'reviews' => 'no'];
+        }
+        if (! is_array($rating) || (! array_key_exists('stars', $rating) && ! array_key_exists('reviews', $rating))) {
+            return null;
+        }
+        $flag = static fn (string $key): string => array_key_exists($key, $rating) ? (Arr::bool($rating, $key) ? 'yes' : 'no') : 'inherit';
+
+        return ['stars' => $flag('stars'), 'reviews' => $flag('reviews')];
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $menus
+     * @return array<string, mixed>
+     */
+    private function menus(array $menus): array
+    {
+        return [
+            'header' => array_map(function (array $item): array {
+                $kind = Arr::string($item, 'kind') ?: 'links';
+                if (! isset(SiteSettings::MENU_KINDS[$kind])) {
+                    ($this->warn)(sprintf('Menú «%s»: kind desconocido «%s» (se usa links).', Arr::string($item, 'label'), $kind));
+                    $kind = 'links';
+                }
+
+                return self::menuLink($item, ['description', 'icon']) + [
+                    'kind' => $kind,
+                    'children' => array_map(static fn (array $child): array => self::menuLink($child, ['description', 'icon', 'group']), Arr::rows($item, 'children')),
+                ];
+            }, Arr::rows($menus, 'header')),
+            'secondary' => array_map(static fn (array $link): array => self::menuLink($link, ['icon']), Arr::rows($menus, 'secondary')),
+            'footer' => array_map(static fn (array $column): array => [
+                'title' => Arr::string($column, 'title'),
+                'links' => array_map(self::link(...), Arr::rows($column, 'links')),
+            ], Arr::rows($menus, 'footer')),
+        ];
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $microcopy
+     * @return array<string, mixed>
+     */
+    private static function microcopy(array $microcopy): array
+    {
+        $cta = static fn (string $key): array => [
+            'title' => Arr::string(Arr::array($microcopy, $key), 'title'),
+            'text' => Arr::string(Arr::array($microcopy, $key), 'text'),
+            'label' => Arr::string(Arr::array($microcopy, $key), 'label'),
+        ];
+
+        return [
+            'cta_banner' => $cta('cta_banner'),
+            'aside_title' => Arr::string($microcopy, 'aside_title'),
+            'aside_bullets' => self::textRows(Arr::strings($microcopy, 'aside_bullets')),
+            'aside_label' => Arr::string($microcopy, 'aside_label'),
+            'mega_footer' => Arr::string($microcopy, 'mega_footer'),
+            'blog_cta' => $cta('blog_cta'),
+            'equipo_cta' => $cta('equipo_cta'),
+        ];
+    }
+
+    /**
+     * site.yaml "ratings" (contract keys, camelCase) → SCF group "ratings" (snake_case).
+     *
+     * @param  array<array-key, mixed>  $ratings
+     * @return array<string, mixed>
+     */
+    private static function ratingsSettings(array $ratings): array
+    {
+        $settings = RatingSettings::fromOption([
+            'enabled' => $ratings['enabled'] ?? true,
+            'types' => Arr::array($ratings, 'types'),
+            'min_count_for_schema' => $ratings['minCountForSchema'] ?? ($ratings['min_count_for_schema'] ?? null),
+            'auto_approve_reviews' => $ratings['autoApproveReviews'] ?? ($ratings['auto_approve_reviews'] ?? false),
+            'texts' => Arr::array($ratings, 'texts'),
+        ]);
+        $types = [];
+        foreach ($settings->types as $type => $flags) {
+            $types[$type] = ['stars' => $flags->stars ? 1 : 0, 'reviews' => $flags->reviews ? 1 : 0];
+        }
+        $texts = [];
+        foreach (RatingSettings::TEXT_FIELDS as $key => $field) {
+            $texts[$field] = $settings->texts[$key];
+        }
+
+        return [
+            'enabled' => $settings->enabled ? 1 : 0,
+            'types' => $types,
+            'min_count_for_schema' => $settings->minCountForSchema,
+            'auto_approve_reviews' => $settings->autoApproveReviews ? 1 : 0,
+            'texts' => $texts,
+        ];
+    }
+
+    /**
+     * site.yaml "toc" (contract keys) → SCF group "toc". "blog" is accepted for blog posts ("post").
+     *
+     * @param  array<array-key, mixed>  $toc
+     * @return array<string, mixed>
+     */
+    private function tocSettings(array $toc): array
+    {
+        $types = [];
+        foreach (Arr::strings($toc, 'enabled_types') as $type) {
+            $type = $type === 'blog' ? 'post' : $type;
+            isset(TocResolver::TYPES[$type]) ? $types[] = $type : ($this->warn)(sprintf('TOC: tipo desconocido «%s» (se omite).', $type));
+        }
+        $depthBlog = TocResolver::depth($toc['depthBlog'] ?? ($toc['depth_blog'] ?? null));
+
+        return [
+            'enabled_types' => array_values(array_unique($types)),
+            'title' => Arr::string($toc, 'title') ?: TocResolver::DEFAULT_TITLE,
+            'title_blog' => (Arr::string($toc, 'titleBlog') ?: Arr::string($toc, 'title_blog')) ?: TocResolver::DEFAULT_TITLE_BLOG,
+            'depth' => (string) (TocResolver::depth($toc['depth'] ?? null) ?? TocResolver::DEFAULT_DEPTH),
+            'depth_blog' => $depthBlog !== null ? (string) $depthBlog : '',
+            'min' => max(1, Arr::int($toc, 'min', TocResolver::DEFAULT_MIN)),
+            'numbered' => Arr::bool($toc, 'numbered') ? 1 : 0,
+            'collapsed_mobile' => (array_key_exists('collapsedMobile', $toc) ? Arr::bool($toc, 'collapsedMobile') : Arr::bool($toc, 'collapsed_mobile', true)) ? 1 : 0,
+            'sticky' => Arr::bool($toc, 'sticky', true) ? 1 : 0,
+        ];
     }
 
     /**
@@ -445,10 +594,16 @@ final class FieldValueMapper
 
     /**
      * @param  array<array-key, mixed>  $link
-     * @return array{label: string, href: string, description: string}
+     * @param  list<string>  $optional
+     * @return array<string, string>
      */
-    private static function menuLink(array $link): array
+    private static function menuLink(array $link, array $optional): array
     {
-        return self::link($link) + ['description' => Arr::string($link, 'description')];
+        $values = self::link($link);
+        foreach ($optional as $key) {
+            $values[$key] = Arr::string($link, $key);
+        }
+
+        return $values;
     }
 }

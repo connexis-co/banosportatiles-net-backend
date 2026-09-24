@@ -15,7 +15,8 @@ final class CiudadNormalizer
     public function __construct(private readonly FieldReader $fields) {}
 
     /**
-     * Full city for /site: every key present (strings may be empty), like seed/ciudades.yaml.
+     * Full city for /site: every key present (strings may be empty), like seed/ciudades.yaml; "region" and the
+     * coordinates are optional and omitted when empty.
      *
      * @return array<string, mixed>
      */
@@ -24,10 +25,13 @@ final class CiudadNormalizer
         $ref = 'term_'.$term->term_id;
         $cercanos = $this->string('cercanos', $ref);
 
+        $region = $this->string('region', $ref);
+
         return array_filter([
             'slug' => $term->slug,
             'name' => self::decode($term->name),
             'departamento' => $this->string('departamento', $ref),
+            'region' => $region !== '' ? $region : null,
             'autoridad_ambiental' => $this->string('autoridad_ambiental', $ref),
             'lat' => Arr::float(['v' => $this->fields->get('lat', $ref)], 'v'),
             'lng' => Arr::float(['v' => $this->fields->get('lng', $ref)], 'v'),

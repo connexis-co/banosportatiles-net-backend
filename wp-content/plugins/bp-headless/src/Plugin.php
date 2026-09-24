@@ -38,6 +38,7 @@ use BanosPortatiles\Headless\Mail\SmtpMailer;
 use BanosPortatiles\Headless\Normalizer\CiudadNormalizer;
 use BanosPortatiles\Headless\Normalizer\FaqNormalizer;
 use BanosPortatiles\Headless\Normalizer\HeroNormalizer;
+use BanosPortatiles\Headless\Normalizer\LogoNormalizer;
 use BanosPortatiles\Headless\Normalizer\NodeNormalizer;
 use BanosPortatiles\Headless\Normalizer\SectionsNormalizer;
 use BanosPortatiles\Headless\Normalizer\SeoNormalizer;
@@ -78,6 +79,7 @@ use BanosPortatiles\Headless\Seo\ScfSeoSource;
 use BanosPortatiles\Headless\Seo\SeoContext;
 use BanosPortatiles\Headless\Seo\SiteSeo;
 use BanosPortatiles\Headless\Seo\WpRankMathApi;
+use BanosPortatiles\Headless\Svg\SvgSanitizer;
 
 /**
  * Composition root: builds the object graph once and registers every module's hooks.
@@ -155,7 +157,7 @@ final class Plugin
             new PageTemplates,
             new FieldRegistrar($config),
             new RestApi(
-                new SiteController($cache, new SiteNormalizer($fields, $refs, $uris, $ciudades, $ratings, new SiteSeo($rankMath, $refs))),
+                new SiteController($cache, new SiteNormalizer($fields, $refs, $uris, $ciudades, $ratings, new SiteSeo($rankMath, $refs), new LogoNormalizer($refs, new SvgSanitizer))),
                 new RoutesController($cache, $uris, $seo),
                 new ContentController($cache, $nodes),
                 new NodeController($cache, $nodes, $uris, $tokens),

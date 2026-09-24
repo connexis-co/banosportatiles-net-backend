@@ -74,19 +74,24 @@ it('merges inline and bank FAQs without duplicates', function (): void {
     ]);
 });
 
-it('keeps the short description of header menu links and drops empty ones', function (): void {
+it('builds the main menu with description, icon, kind and grouped children', function (): void {
     $menu = \BanosPortatiles\Headless\Normalizer\SiteNormalizer::headerMenu([
-        ['label' => 'Alquiler', 'href' => '/alquiler/', 'description' => 'Para obras y eventos', 'children' => [
-            ['label' => 'Eventos', 'href' => '/alquiler/eventos/', 'description' => 'Bodas y conciertos'],
-            ['label' => 'Obras', 'href' => '/alquiler/obras/', 'description' => ''],
+        ['label' => 'Alquiler', 'href' => '/alquiler/', 'description' => 'Para obras y eventos', 'icon' => 'toilet', 'kind' => '', 'children' => [
+            ['label' => 'Eventos', 'href' => '/alquiler/eventos/', 'description' => 'Bodas y conciertos', 'icon' => 'party-popper', 'group' => ''],
+            ['label' => 'Obras', 'href' => '/alquiler/obras/', 'description' => '', 'group' => 'Construcción'],
             ['label' => '', 'href' => '/sin-texto/'],
         ]],
+        ['label' => 'Ciudades', 'href' => '', 'kind' => 'ciudades', 'children' => []],
+        ['label' => 'Raro', 'href' => '/x/', 'kind' => 'inventado'],
+        ['label' => '', 'href' => '/sin-texto/'],
     ]);
 
     expect($menu)->toBe([
-        ['label' => 'Alquiler', 'href' => '/alquiler/', 'description' => 'Para obras y eventos', 'children' => [
-            ['label' => 'Eventos', 'href' => '/alquiler/eventos/', 'description' => 'Bodas y conciertos'],
-            ['label' => 'Obras', 'href' => '/alquiler/obras/'],
+        ['label' => 'Alquiler', 'href' => '/alquiler/', 'description' => 'Para obras y eventos', 'icon' => 'toilet', 'kind' => 'links', 'children' => [
+            ['label' => 'Eventos', 'href' => '/alquiler/eventos/', 'description' => 'Bodas y conciertos', 'icon' => 'party-popper'],
+            ['label' => 'Obras', 'href' => '/alquiler/obras/', 'group' => 'Construcción'],
         ]],
+        ['label' => 'Ciudades', 'href' => '', 'kind' => 'ciudades', 'children' => []],
+        ['label' => 'Raro', 'href' => '/x/', 'kind' => 'links', 'children' => []],
     ]);
 });
