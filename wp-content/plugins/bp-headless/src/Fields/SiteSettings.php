@@ -48,6 +48,11 @@ final class SiteSettings
             $l->text('label', 'Texto'),
             $l->text('href', 'Enlace'),
         ];
+        // Enlaces del menú principal: además, una frase corta que el mega-menú muestra bajo el texto.
+        $menuLink = static fn (FieldBuilder $l): array => [
+            ...$link($l),
+            $l->text('description', 'Descripción corta', ['instructions' => 'Opcional. Una frase de máx. 80 caracteres que se ve bajo el enlace en el mega-menú.', 'maxlength' => 110]),
+        ];
 
         return FieldGroups::group('site', 'Ajustes del sitio', [[['param' => 'options_page', 'operator' => '==', 'value' => self::MENU_SLUG]]], [
             $f->tab('tab_brand', 'Marca y contacto'),
@@ -91,8 +96,8 @@ final class SiteSettings
             $f->tab('tab_menus', 'Menús'),
             $f->group('menus', 'Menús', static fn (FieldBuilder $m): array => [
                 $m->repeater('header', 'Menú principal', static fn (FieldBuilder $h): array => [
-                    ...$link($h),
-                    $h->repeater('children', 'Submenú', $link),
+                    ...$menuLink($h),
+                    $h->repeater('children', 'Submenú', $menuLink),
                 ], ['layout' => 'block', 'button_label' => 'Añadir elemento']),
                 $m->repeater('footer', 'Footer (columnas)', static fn (FieldBuilder $c): array => [
                     $c->text('title', 'Título de la columna'),

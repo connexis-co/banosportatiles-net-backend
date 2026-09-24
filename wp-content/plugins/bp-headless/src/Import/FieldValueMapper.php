@@ -233,8 +233,8 @@ final class FieldValueMapper
         if (isset($site['menus']) && is_array($site['menus'])) {
             $menus = $site['menus'];
             $values['menus'] = [
-                'header' => array_map(static fn (array $item): array => self::link($item) + [
-                    'children' => array_map(self::link(...), Arr::rows($item, 'children')),
+                'header' => array_map(static fn (array $item): array => self::menuLink($item) + [
+                    'children' => array_map(self::menuLink(...), Arr::rows($item, 'children')),
                 ], Arr::rows($menus, 'header')),
                 'footer' => array_map(static fn (array $column): array => [
                     'title' => Arr::string($column, 'title'),
@@ -353,5 +353,14 @@ final class FieldValueMapper
     private static function link(array $link): array
     {
         return ['label' => Arr::string($link, 'label'), 'href' => Arr::string($link, 'href')];
+    }
+
+    /**
+     * @param  array<array-key, mixed>  $link
+     * @return array{label: string, href: string, description: string}
+     */
+    private static function menuLink(array $link): array
+    {
+        return self::link($link) + ['description' => Arr::string($link, 'description')];
     }
 }

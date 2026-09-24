@@ -84,3 +84,20 @@ it('merges inline and bank FAQs without duplicates', function (): void {
         ['q' => '¿Cuántos baños necesito?', 'a' => 'INLINE'],
     ]);
 });
+
+it('keeps the short description of header menu links and drops empty ones', function (): void {
+    $menu = \BanosPortatiles\Headless\Normalizer\SiteNormalizer::headerMenu([
+        ['label' => 'Alquiler', 'href' => '/alquiler/', 'description' => 'Para obras y eventos', 'children' => [
+            ['label' => 'Eventos', 'href' => '/alquiler/eventos/', 'description' => 'Bodas y conciertos'],
+            ['label' => 'Obras', 'href' => '/alquiler/obras/', 'description' => ''],
+            ['label' => '', 'href' => '/sin-texto/'],
+        ]],
+    ]);
+
+    expect($menu)->toBe([
+        ['label' => 'Alquiler', 'href' => '/alquiler/', 'description' => 'Para obras y eventos', 'children' => [
+            ['label' => 'Eventos', 'href' => '/alquiler/eventos/', 'description' => 'Bodas y conciertos'],
+            ['label' => 'Obras', 'href' => '/alquiler/obras/'],
+        ]],
+    ]);
+});

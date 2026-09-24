@@ -64,19 +64,36 @@ final class SiteNormalizer
 
     /**
      * @param  list<array<array-key, mixed>>  $rows
-     * @return list<array{label: string, href: string, children: list<array{label: string, href: string}>}>
+     * @return list<array{label: string, href: string, description?: string, children: list<array{label: string, href: string, description?: string}>}>
      */
     public static function headerMenu(array $rows): array
     {
         $items = [];
         foreach ($rows as $row) {
-            $link = SectionsNormalizer::link($row);
+            $link = self::menuLink($row);
             if ($link !== null) {
-                $items[] = $link + ['children' => self::links(Arr::rows($row, 'children'))];
+                $children = array_values(array_filter(array_map(self::menuLink(...), Arr::rows($row, 'children'))));
+                $items[] = $link + ['children' => $children];
             }
         }
 
         return $items;
+    }
+
+    /**
+     * Enlace del menú principal: texto, destino y, si la hay, la descripción corta del mega-menú.
+     *
+     * @return array{label: string, href: string, description?: string}|null
+     */
+    private static function menuLink(mixed $row): ?array
+    {
+        $link = SectionsNormalizer::link($row);
+        if ($link === null || ! is_array($row)) {
+            return $link;
+        }
+        $description = Arr::string($row, 'description');
+
+        return $description !== '' ? $link + ['description' => $description] : $link;
     }
 
     /**
