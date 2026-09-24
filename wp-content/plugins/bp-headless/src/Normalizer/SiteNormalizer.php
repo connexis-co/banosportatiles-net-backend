@@ -9,6 +9,7 @@ use BanosPortatiles\Headless\Content\Taxonomies;
 use BanosPortatiles\Headless\Fields\FieldReader;
 use BanosPortatiles\Headless\Reviews\RatingService;
 use BanosPortatiles\Headless\Routing\UriResolver;
+use BanosPortatiles\Headless\Seo\SiteSeo;
 use BanosPortatiles\Headless\Support\Arr;
 
 /**
@@ -22,6 +23,7 @@ final class SiteNormalizer
         private readonly UriResolver $uris,
         private readonly CiudadNormalizer $ciudades,
         private readonly RatingService $ratings,
+        private readonly SiteSeo $seo,
     ) {}
 
     /**
@@ -55,6 +57,7 @@ final class SiteNormalizer
             'categorias' => $this->categorias(),
             'ratings' => $this->ratings->settings()->toSite($this->ratings->available()),
             'toc' => TocResolver::site($this->fields->get('toc', Config::OPTIONS_ID)),
+            'seo' => $this->seo->toSite(Arr::string($brand, 'name') ?: html_entity_decode((string) get_bloginfo('name'), ENT_QUOTES | ENT_HTML5, 'UTF-8')),
         ];
 
         // Single source of truth: the «Sitio en venta» plugin (bp-sitio-en-venta). Omitted when it is not active.

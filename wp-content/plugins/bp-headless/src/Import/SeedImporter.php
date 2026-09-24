@@ -10,6 +10,7 @@ use BanosPortatiles\Headless\Content\Taxonomies;
 use BanosPortatiles\Headless\Fields\FieldBuilder;
 use BanosPortatiles\Headless\Redirects\RedirectionRepository;
 use BanosPortatiles\Headless\Routing\UriResolver;
+use BanosPortatiles\Headless\Seo\RankMathSeoWriter;
 use BanosPortatiles\Headless\Support\Arr;
 
 /**
@@ -55,6 +56,7 @@ final class SeedImporter implements SeedLookup
     public function __construct(
         private readonly UriResolver $uris,
         private readonly RedirectionRepository $redirects,
+        private readonly RankMathSeoWriter $rankMath,
     ) {
         $this->report = new ImportReport;
         $this->media = new MediaImporter(null, true, $this->report);
@@ -486,7 +488,9 @@ final class SeedImporter implements SeedLookup
         $imageId !== null ? set_post_thumbnail($id, $imageId) : delete_post_thumbnail($id);
 
         $root = new FieldBuilder;
-        update_field($root->key('seo'), $this->mapper->seo(Arr::array($item, 'seo')), $id);
+        $seo = $this->mapper->seo(Arr::array($item, 'seo'));
+        update_field($root->key('seo'), $seo, $id);
+        $this->rankMath->write($id, $seo);
         update_field($root->key('faqs'), $this->mapper->faqs($item), $id);
 
         $price = $this->mapper->price($item);

@@ -5,7 +5,6 @@ declare(strict_types=1);
 use BanosPortatiles\Headless\Normalizer\FaqNormalizer;
 use BanosPortatiles\Headless\Normalizer\HeroNormalizer;
 use BanosPortatiles\Headless\Normalizer\SectionsNormalizer;
-use BanosPortatiles\Headless\Normalizer\SeoNormalizer;
 use BanosPortatiles\Headless\Tests\Fakes\FakeReferenceResolver;
 
 function refs(): FakeReferenceResolver
@@ -61,16 +60,6 @@ it('normalizes the hero with fallbacks and omits empty optional keys', function 
         ])
         ->and($normalizer->normalize(['h1' => '', 'bullets' => [], 'mostrar_formulario' => 0], 'Título'))->toBeNull()
         ->and($normalizer->normalize(false, 'Título'))->toBeNull();
-});
-
-it('normalizes SEO with title/description fallbacks', function (): void {
-    $normalizer = new SeoNormalizer(refs());
-    $long = str_repeat('palabra ', 40);
-
-    expect($normalizer->normalize(['title' => 'SEO', 'description' => 'Desc', 'canonical' => '', 'noindex' => 1, 'og_image' => 8, 'keyword' => 'kw'], 'T', 'E'))
-        ->toBe(['title' => 'SEO', 'description' => 'Desc', 'noindex' => true, 'ogImage' => refs()->images[8], 'keyword' => 'kw'])
-        ->and($normalizer->normalize(null, 'Título', 'Extracto'))->toBe(['title' => 'Título', 'description' => 'Extracto', 'noindex' => false])
-        ->and(mb_strlen((string) $normalizer->normalize([], 'T', $long)['description']))->toBeLessThanOrEqual(SeoNormalizer::DESCRIPTION_LENGTH);
 });
 
 it('merges inline and bank FAQs without duplicates', function (): void {

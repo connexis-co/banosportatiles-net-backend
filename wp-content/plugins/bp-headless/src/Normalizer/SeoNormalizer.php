@@ -4,35 +4,55 @@ declare(strict_types=1);
 
 namespace BanosPortatiles\Headless\Normalizer;
 
-use BanosPortatiles\Headless\Support\Arr;
+use BanosPortatiles\Headless\Seo\RankMathSeoSource;
+use BanosPortatiles\Headless\Seo\ScfSeoSource;
+use BanosPortatiles\Headless\Seo\SeoSource;
 
 /**
- * SCF "seo" group → {title, description, canonical?, noindex, ogImage?, keyword?}.
+ * Node "seo": Rank Math when it is active (seo.source = "rankmath"), else the SCF group «SEO» ("bp").
+ * If reading Rank Math fails (e.g. it changed its meta), the node falls back to SCF instead of breaking the API.
  */
 final class SeoNormalizer
 {
     public const DESCRIPTION_LENGTH = 155;
 
-    public function __construct(private readonly ReferenceResolver $refs) {}
+    public function __construct(
+        private readonly RankMathSeoSource $rankMath,
+        private readonly ScfSeoSource $scf,
+    ) {}
+
+    public function source(): SeoSource
+    {
+        return $this->rankMath->available() ? $this->rankMath : $this->scf;
+    }
 
     /**
      * @return array<string, mixed>
      */
-    public function normalize(mixed $seo, string $fallbackTitle, string $fallbackDescription): array
+    public function normalize(\WP_Post $post, string $fallbackTitle, string $fallbackDescription, string $uri): array
     {
-        $seo = is_array($seo) ? $seo : [];
-        $ogImageId = Arr::ids($seo['og_image'] ?? null)[0] ?? 0;
-        $title = Arr::string($seo, 'title');
-        $description = Arr::string($seo, 'description');
+        if ($this->rankMath->available()) {
+            try {
+                return $this->rankMath->normalize($post, $fallbackTitle, $fallbackDescription, $uri);
+            } catch (\Throwable $e) {
+                self::report($e, $post);
+            }
+        }
 
-        return array_filter([
-            'title' => $title !== '' ? $title : $fallbackTitle,
-            'description' => $description !== '' ? $description : self::truncate($fallbackDescription, self::DESCRIPTION_LENGTH),
-            'canonical' => Arr::string($seo, 'canonical') ?: null,
-            'noindex' => Arr::bool($seo, 'noindex'),
-            'ogImage' => $ogImageId > 0 ? $this->refs->image($ogImageId) : null,
-            'keyword' => Arr::string($seo, 'keyword') ?: null,
-        ], static fn (mixed $v): bool => $v !== null);
+        return $this->scf->normalize($post, $fallbackTitle, $fallbackDescription, $uri);
+    }
+
+    public function noindex(\WP_Post $post): bool
+    {
+        if ($this->rankMath->available()) {
+            try {
+                return $this->rankMath->noindex($post);
+            } catch (\Throwable $e) {
+                self::report($e, $post);
+            }
+        }
+
+        return $this->scf->noindex($post);
     }
 
     public static function truncate(string $text, int $length): string
@@ -45,5 +65,10 @@ final class SeoNormalizer
         $space = mb_strrpos($cut, ' ');
 
         return rtrim($space !== false ? mb_substr($cut, 0, $space) : $cut, ' ,.;:').'…';
+    }
+
+    private static function report(\Throwable $e, \WP_Post $post): void
+    {
+        error_log(sprintf('[bp-headless] Rank Math SEO failed for post %d, using SCF: %s', $post->ID, $e->getMessage()));
     }
 }

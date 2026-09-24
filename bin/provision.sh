@@ -79,6 +79,7 @@ say "Site Reviews, Rank Math and Safe SVG"
 # shellcheck disable=SC2086 # word splitting is intended
 wp plugin activate $INTEGRATIONS --quiet
 wp bp setup reviews >/dev/null
+wp bp setup rankmath >/dev/null
 
 say "Redirection database"
 wp redirection database install >/dev/null 2>&1 || true

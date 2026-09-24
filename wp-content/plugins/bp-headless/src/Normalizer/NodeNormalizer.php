@@ -65,7 +65,7 @@ final class NodeNormalizer
             'excerpt' => $excerpt,
             'order' => $post->menu_order,
             'contentHtml' => $contentHtml,
-            'seo' => $this->seo->normalize($this->fields->get('seo', $id), $title, $excerpt),
+            'seo' => $this->seo->normalize($post, $title, $excerpt, $uri),
         ];
 
         if ($type === 'page') {

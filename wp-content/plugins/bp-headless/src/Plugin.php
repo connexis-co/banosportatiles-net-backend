@@ -12,6 +12,7 @@ use BanosPortatiles\Headless\Cache\ContentChangeListener;
 use BanosPortatiles\Headless\Cache\ResponseCache;
 use BanosPortatiles\Headless\Cli\BpCommand;
 use BanosPortatiles\Headless\Cli\ReviewsCommand;
+use BanosPortatiles\Headless\Cli\SeoCommand;
 use BanosPortatiles\Headless\Content\PageTemplates;
 use BanosPortatiles\Headless\Content\PostTypes;
 use BanosPortatiles\Headless\Content\Taxonomies;
@@ -70,6 +71,13 @@ use BanosPortatiles\Headless\Security\PreviewToken;
 use BanosPortatiles\Headless\Security\RestGuard;
 use BanosPortatiles\Headless\Security\SecurityHeaders;
 use BanosPortatiles\Headless\Security\SignedRequestGuard;
+use BanosPortatiles\Headless\Seo\RankMathSeoSource;
+use BanosPortatiles\Headless\Seo\RankMathSeoWriter;
+use BanosPortatiles\Headless\Seo\ScfSeoFields;
+use BanosPortatiles\Headless\Seo\ScfSeoSource;
+use BanosPortatiles\Headless\Seo\SeoContext;
+use BanosPortatiles\Headless\Seo\SiteSeo;
+use BanosPortatiles\Headless\Seo\WpRankMathApi;
 
 /**
  * Composition root: builds the object graph once and registers every module's hooks.
@@ -104,6 +112,11 @@ final class Plugin
         $refs = new WpReferenceResolver($uris, $renderer);
         $fields = new AcfFieldReader;
         $ciudades = new CiudadNormalizer($fields);
+        $rankMath = new WpRankMathApi;
+        $seoContext = new SeoContext($config->frontendUrl(), array_values(array_unique(array_filter([
+            HtmlCleaner::authority($cmsOrigin), $frontHost, 'www.'.$frontHost, $canonicalHost, 'www.'.$canonicalHost,
+        ]))));
+        $seo = new SeoNormalizer(new RankMathSeoSource($rankMath, $refs, $seoContext), new ScfSeoSource($fields, $refs, $seoContext));
         $reviewsGuard = new ReviewsWriteGuard;
         $ratings = new RatingService(
             SiteReviewsGateway::isActive() ? new SiteReviewsGateway($reviewsGuard) : new NullReviewsGateway,
@@ -118,7 +131,7 @@ final class Plugin
             $refs,
             $uris,
             $renderer,
-            new SeoNormalizer($refs),
+            $seo,
             new HeroNormalizer($refs),
             new SectionsNormalizer($refs),
             new FaqNormalizer($refs, $renderer->fragment(...)),
@@ -142,8 +155,8 @@ final class Plugin
             new PageTemplates,
             new FieldRegistrar($config),
             new RestApi(
-                new SiteController($cache, new SiteNormalizer($fields, $refs, $uris, $ciudades, $ratings)),
-                new RoutesController($cache, $uris),
+                new SiteController($cache, new SiteNormalizer($fields, $refs, $uris, $ciudades, $ratings, new SiteSeo($rankMath, $refs))),
+                new RoutesController($cache, $uris, $seo),
                 new ContentController($cache, $nodes),
                 new NodeController($cache, $nodes, $uris, $tokens),
                 new FaqsController($cache, $renderer),
@@ -174,6 +187,7 @@ final class Plugin
             $reviewsGuard,
             new ReviewChangeListener($cache, $scheduler),
             new ReviewsAdmin($ratings),
+            new ScfSeoFields($rankMath),
         ];
 
         foreach ($modules as $module) {
@@ -181,8 +195,9 @@ final class Plugin
         }
 
         if (defined('WP_CLI') && WP_CLI) {
-            BpCommand::register(new BpCommand(new SeedImporter($uris, $redirects), $scheduler, $cache, $listener, $previews, $leads, $notifier));
+            BpCommand::register(new BpCommand(new SeedImporter($uris, $redirects, new RankMathSeoWriter($rankMath)), $scheduler, $cache, $listener, $previews, $leads, $notifier));
             ReviewsCommand::register(new ReviewsCommand($ratings, $nodeLocator, $cache));
+            SeoCommand::register(new SeoCommand($fields, $uris, $cache));
         }
     }
 
