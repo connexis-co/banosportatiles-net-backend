@@ -6,13 +6,16 @@ BP_SYNC_COMPOSE_FILE="docker-compose.yml:docker-compose.sync.yml"
 bp_log() { printf '\033[1;34m▸ %s\033[0m\n' "$*"; }
 bp_warn() { printf '\033[1;33m! %s\033[0m\n' "$*" >&2; }
 
-# Loads backend/.env into the environment.
+# Loads backend/.env into the environment. A BP_SEED_DIR given on the command line wins over the one in
+# backend/.env (BP_SEED_DIR=… bin/setup.sh imports another bundle without editing .env).
 bp_load_env() {
   [[ -f .env ]] || { echo "backend/.env not found: run bin/setup.sh" >&2; exit 1; }
+  local seed_dir="${BP_SEED_DIR-}" seed_dir_set="${BP_SEED_DIR+1}"
   set -a
   # shellcheck disable=SC1091
   source .env
   set +a
+  if [[ -n "$seed_dir_set" ]]; then export BP_SEED_DIR="$seed_dir"; fi
 }
 
 # Sets or replaces KEY=VALUE in backend/.env (empty VALUE removes the key).
