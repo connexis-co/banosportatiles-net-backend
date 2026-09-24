@@ -14,7 +14,9 @@ use RankMath\Helper;
  * - "Headless CMS support" (/rankmath/v1/getHead) on,
  * - SEO analysis + ACF modules on; sitemap, schema, redirections, 404 monitor, instant indexing, analytics,
  *   image SEO, link counter, llms.txt and AI visibility off (the Astro site does those, Redirection keeps the 301),
- * - separator "|" and the brand as website name, and title/description templates for the "equipo" type.
+ * - separator "|" and the brand as website name the first time only: from then on they belong to the editor
+ *   (Rank Math → Títulos y meta) and to the seed import (site.seo), which marks them as applied too,
+ * - title/description templates for the "equipo" type (only when missing).
  */
 final class RankMathSetup
 {
@@ -26,6 +28,14 @@ final class RankMathSetup
     ];
 
     public const SEPARATOR = '|';
+
+    public const TITLES_OPTION = 'rank-math-options-titles';
+
+    /** Site-wide title settings that the setup only seeds once (see DEFAULTS_OPTION). */
+    public const SITE_KEYS = ['title_separator', 'website_name'];
+
+    /** SITE_KEYS already applied by the setup or written by the seed import: never overwritten by the setup. */
+    public const DEFAULTS_OPTION = 'bp_headless_rankmath_defaults';
 
     /** Post type templates created when Rank Math was installed before the type existed. */
     public const POST_TYPE_DEFAULTS = [
@@ -68,18 +78,60 @@ final class RankMathSetup
 
         $rows[] = $this->group('rank-math-options-general', ['headless_support' => 'on']);
 
-        $titles = ['title_separator' => self::SEPARATOR, 'website_name' => $siteName];
-        $current = get_option('rank-math-options-titles', []);
+        $current = get_option(self::TITLES_OPTION, []);
+        $titles = self::titleDefaults($siteName, self::appliedDefaults(), is_array($current) ? $current : [], $postTypes);
+        $rows[] = $this->group(self::TITLES_OPTION, $titles);
+        self::markApplied(array_keys(array_intersect_key($titles, array_flip(self::SITE_KEYS))));
+
+        return $rows;
+    }
+
+    /**
+     * Title settings to write: separator and website name unless already applied (an empty name is skipped, so a
+     * later run with the brand imported sets it), and the post type templates that do not exist yet.
+     *
+     * @param  list<string>  $applied  SITE_KEYS already applied.
+     * @param  array<array-key, mixed>  $current  Stored "rank-math-options-titles".
+     * @param  list<string>  $postTypes
+     * @return array<string, mixed>
+     */
+    public static function titleDefaults(string $siteName, array $applied, array $current, array $postTypes): array
+    {
+        $titles = [];
+        if (! in_array('title_separator', $applied, true)) {
+            $titles['title_separator'] = self::SEPARATOR;
+        }
+        $siteName = trim($siteName);
+        if ($siteName !== '' && ! in_array('website_name', $applied, true)) {
+            $titles['website_name'] = $siteName;
+        }
         foreach ($postTypes as $type) {
             foreach (self::POST_TYPE_DEFAULTS as $key => $value) {
-                if (! is_array($current) || ! array_key_exists("pt_{$type}_{$key}", $current)) {
+                if (! array_key_exists("pt_{$type}_{$key}", $current)) {
                     $titles["pt_{$type}_{$key}"] = $value;
                 }
             }
         }
-        $rows[] = $this->group('rank-math-options-titles', $titles);
 
-        return $rows;
+        return $titles;
+    }
+
+    /** @return list<string> */
+    public static function appliedDefaults(): array
+    {
+        $applied = get_option(self::DEFAULTS_OPTION, []);
+
+        return is_array($applied) ? array_values(array_intersect(self::SITE_KEYS, $applied)) : [];
+    }
+
+    /** @param list<string> $keys */
+    public static function markApplied(array $keys): void
+    {
+        $applied = self::appliedDefaults();
+        $merged = array_values(array_intersect(self::SITE_KEYS, array_merge($applied, $keys)));
+        if ($merged !== $applied) {
+            update_option(self::DEFAULTS_OPTION, $merged, false);
+        }
     }
 
     /**
@@ -119,10 +171,15 @@ final class RankMathSetup
     {
         $stored = get_option($option, []);
         $stored = is_array($stored) ? $stored : [];
-        $merged = $values + $stored;
-        $changed = array_intersect_key($stored, $values) !== $values;
+        $changed = false;
+        foreach ($values as $key => $value) {
+            $changed = $changed || ! array_key_exists($key, $stored) || $stored[$key] !== $value;
+        }
         if ($changed) {
-            update_option($option, $merged);
+            update_option($option, $values + $stored);
+        }
+        if ($values === []) {
+            return ['ajuste' => $option, 'valor' => '(ya configurado)', 'estado' => 'sin cambios'];
         }
         $summary = [];
         foreach ($values as $key => $value) {

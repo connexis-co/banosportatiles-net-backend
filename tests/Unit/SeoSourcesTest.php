@@ -6,6 +6,7 @@ use BanosPortatiles\Headless\Normalizer\SeoNormalizer;
 use BanosPortatiles\Headless\Seo\CanonicalUrl;
 use BanosPortatiles\Headless\Seo\RankMathMigration;
 use BanosPortatiles\Headless\Seo\RankMathSeoSource;
+use BanosPortatiles\Headless\Seo\RankMathSeoWriter;
 use BanosPortatiles\Headless\Seo\RankMathSetup;
 use BanosPortatiles\Headless\Seo\ScfSeoSource;
 use BanosPortatiles\Headless\Seo\SeoContext;
@@ -194,4 +195,44 @@ it('plans the SCF → Rank Math migration without overwriting (unless forced) an
 it('turns the needed Rank Math modules on and the unused ones off', function (): void {
     expect(RankMathSetup::modules(['link-counter', 'analytics', 'seo-analysis', 'sitemap', 'rich-snippet', 'content-ai', 'llms-txt']))
         ->toBe(['seo-analysis', 'content-ai', 'acf']);
+});
+
+it('seeds the separator and the website name only once and never with an empty name', function (): void {
+    $fresh = RankMathSetup::titleDefaults('BañosPortátiles.net', [], ['pt_equipo_title' => 'Ya existe'], ['equipo']);
+
+    expect($fresh)->toMatchArray(['title_separator' => '|', 'website_name' => 'BañosPortátiles.net'])
+        ->not->toHaveKey('pt_equipo_title')
+        ->toHaveKey('pt_equipo_description')
+        ->and(RankMathSetup::titleDefaults('BañosPortátiles.net', ['title_separator', 'website_name'], [], []))->toBe([])
+        ->and(RankMathSetup::titleDefaults('  ', [], [], []))->toBe(['title_separator' => '|']);
+});
+
+it('writes site.seo from the seed to Rank Math and marks it so the setup keeps it', function (): void {
+    $options = [
+        RankMathSetup::TITLES_OPTION => ['title_separator' => '-', 'website_name' => 'BañosPortátiles.net CMS', 'pt_page_title' => '%title%'],
+    ];
+    Functions\when('get_option')->alias(static function (string $name, mixed $default = false) use (&$options): mixed {
+        return $options[$name] ?? $default;
+    });
+    Functions\when('update_option')->alias(static function (string $name, mixed $value) use (&$options): bool {
+        $options[$name] = $value;
+
+        return true;
+    });
+    $writer = new RankMathSeoWriter(new FakeRankMathApi);
+
+    expect($writer->writeSite('BañosPortátiles.net', '|'))->toBeTrue()
+        ->and($options[RankMathSetup::TITLES_OPTION])->toBe(['website_name' => 'BañosPortátiles.net', 'title_separator' => '|', 'pt_page_title' => '%title%'])
+        ->and($options[RankMathSetup::DEFAULTS_OPTION])->toBe(['title_separator', 'website_name'])
+        ->and(RankMathSetup::appliedDefaults())->toBe(['title_separator', 'website_name'])
+        ->and($writer->writeSite('BañosPortátiles.net', '|'))->toBeFalse()
+        ->and((new RankMathSeoWriter(new FakeRankMathApi(isActive: false)))->writeSite('Otra marca', '-'))->toBeFalse()
+        ->and($options[RankMathSetup::TITLES_OPTION]['website_name'])->toBe('BañosPortátiles.net');
+});
+
+it('keeps only a usable site name and a short separator', function (): void {
+    expect(RankMathSeoWriter::siteValues(' BañosPortátiles.net ', ' | '))->toBe(['website_name' => 'BañosPortátiles.net', 'title_separator' => '|'])
+        ->and(RankMathSeoWriter::siteValues('', ''))->toBe([])
+        ->and(RankMathSeoWriter::siteValues('Marca', 'demasiado largo'))->toBe(['website_name' => 'Marca'])
+        ->and(RankMathSeoWriter::siteValues('', '—'))->toBe(['title_separator' => '—']);
 });

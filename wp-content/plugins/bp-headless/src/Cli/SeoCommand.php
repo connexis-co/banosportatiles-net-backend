@@ -27,7 +27,7 @@ final class SeoCommand
     public static function register(self $command): void
     {
         \WP_CLI::add_command('bp setup rankmath', [$command, 'setup'], [
-            'shortdesc' => 'Configura Rank Math para el sitio headless (sin asistente, headless support, módulos, separador y plantillas del CPT equipo). Idempotente.',
+            'shortdesc' => 'Configura Rank Math para el sitio headless (sin asistente, headless support, módulos, plantillas del CPT equipo y, solo la primera vez, separador y nombre del sitio). Idempotente.',
         ]);
         \WP_CLI::add_command('bp seo migrate-rankmath', [$command, 'migrate'], [
             'shortdesc' => 'Copia el SEO del grupo SCF «SEO» a Rank Math (título, descripción, keywords, canonical, noindex e imagen social).',
@@ -44,9 +44,10 @@ final class SeoCommand
      */
     public function setup(array $args, array $assoc): void
     {
+        // The brand of «Ajustes del sitio» (not the CMS title): empty before the first seed import, which then
+        // writes site.seo → Rank Math itself.
         $brand = $this->fields->get('brand', Config::OPTIONS_ID);
         $name = is_array($brand) ? Arr::string($brand, 'name') : '';
-        $name = $name !== '' ? $name : html_entity_decode((string) get_bloginfo('name'), ENT_QUOTES | ENT_HTML5, 'UTF-8');
 
         try {
             $rows = (new RankMathSetup)->apply($name, [PostTypes::EQUIPO]);

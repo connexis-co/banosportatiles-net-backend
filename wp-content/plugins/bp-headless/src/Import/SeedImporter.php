@@ -219,6 +219,9 @@ final class SeedImporter implements SeedLookup
         if ($tagline !== '') {
             update_option('blogdescription', $tagline);
         }
+        $seo = Arr::array($site, 'seo');
+        $siteName = Arr::string($seo, 'siteName');
+        $this->rankMath->writeSite($siteName !== '' ? $siteName : $name, Arr::string($seo, 'separator'));
         update_option('bp_headless_seed_site_hash', $hash, false);
     }
 
