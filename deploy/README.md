@@ -105,7 +105,7 @@ ssh connexis-prod "runuser -u banosportatiles-cms -- php8.4 /usr/local/bin/wp --
 
 ## 6. Probar el deploy sin servidor
 
-[`cloudpanel/sim/run.sh`](cloudpanel/sim/run.sh) ejecuta el `deploy.sh` real contra un CloudPanel simulado en Docker: Debian con PHP 8.4, un `clpctl` falso, la MariaDB local en `127.0.0.1` y un `ssh` falso con `docker exec`. Hace una pasada nueva y otra idempotente y verifica 14 puntos: vhost, permisos, constantes, contraseña del admin, plugins, ajustes, contenido de ejemplo, API, aviso de venta, cron y certificado. Requiere el Docker local levantado (`bin/setup.sh`). Úsalo antes de cada deploy real si cambió algo en `deploy/cloudpanel/`.
+[`cloudpanel/sim/run.sh`](cloudpanel/sim/run.sh) ejecuta el `deploy.sh` real contra un CloudPanel simulado en Docker: Debian con PHP 8.4, un `clpctl` falso, la MariaDB local en `127.0.0.1` y un `ssh` falso con `docker exec`. Hace una pasada nueva, otra idempotente y una tercera con `--seed-force`, y verifica 17 puntos: vhost, permisos, constantes, contraseña del admin, plugins (incluidos Site Reviews, Rank Math y Safe SVG), setups, ajustes, contenido de ejemplo, API, aviso de venta, nombre del sitio en Rank Math, cron y certificado. Requiere el Docker local levantado (`bin/setup.sh`). Úsalo antes de cada deploy real si cambió algo en `deploy/cloudpanel/`.
 
 ## 7. Backups
 
@@ -127,3 +127,43 @@ El sitio público no depende del CMS en caliente, porque Astro se construye con 
 - **Código:** vuelve a desplegar el commit anterior (`git checkout <sha> -- wp-content deploy && deploy/cloudpanel/deploy.sh`).
 - **Datos:** restaura el último backup de CloudPanel.
 - **Borrado total** del CMS (irreversible): `clpctl site:delete --domainName=admin.banosportatiles.net --force`.
+
+## 10. Actualización a la 1.1.0 (valoraciones, precios, TOC, Rank Math, menús e imágenes)
+
+Una sola vez, en este orden (plan `docs/plans/2026-09-24_valoraciones-toc-rankmath-precios.md` §9). `WP` abrevia el
+WP-CLI del sitio en el servidor:
+
+```bash
+WP='runuser -u banosportatiles-cms -- php8.4 -d memory_limit=512M /usr/local/bin/wp --path=/home/banosportatiles-cms/htdocs/admin.banosportatiles.net'
+
+# 1. Bundle del seed del frontend (el mismo que usa el build)
+(cd ../frontend && pnpm seed:bundle --out ../backend/dist/seed-front)
+
+# 2. Código + plugins (Site Reviews, Rank Math, Safe SVG) + setups + seed reescrito completo
+deploy/cloudpanel/deploy.sh --dry-run --seed=dist/seed-front --seed-force   # revisar
+deploy/cloudpanel/deploy.sh --seed=dist/seed-front --seed-force
+
+# 3. SEO de SCF → Rank Math (lo que el seed no cubra; nunca pisa lo que ya tenga Rank Math)
+ssh connexis-prod "$WP bp seo migrate-rankmath --dry-run"
+ssh connexis-prod "$WP bp seo migrate-rankmath"
+
+# 4. Comprobación
+ssh connexis-prod "$WP plugin list --status=active --field=name"
+ssh connexis-prod "$WP bp reviews stats"      # todo en 0: sin votos de ejemplo
+API=https://admin.banosportatiles.net/wp-json/bp/v1
+curl -s $API/site | jq '{seo, ratings: .ratings.enabled, toc: .toc.enabled_types}'
+curl -s "$API/ratings" | jq 'length'
+curl -s -o /dev/null -w '%{http_code}\n' -X POST $API/ratings              # 401 (sin firma)
+```
+
+Después, en el admin:
+- **Site Reviews → Ajustes → Notificaciones:** el email que recibe los avisos de opiniones nuevas (por defecto, el del admin de WordPress).
+- **Ajustes del sitio → Despliegue:** el deploy hook y el rebuild diario (activo por defecto a las 04:00).
+- **Ajustes del sitio → Valoraciones:** qué tipos de página tienen estrellas u opiniones.
+
+`--seed-force` reescribe con el seed todo el contenido importado, incluidas las ediciones hechas en el CMS después del
+último import. Si alguien editó páginas en el CMS, hay que pasar esos cambios al seed antes, o desplegar sin `--seed-force`.
+Así, solo se reimportan los YAML que cambiaron.
+
+Rollback de la 1.1.0: `ssh connexis-prod "$WP plugin deactivate site-reviews seo-by-rank-math safe-svg"`.
+bp-headless sigue funcionando: el SEO sale de SCF y el Node no trae `rating`. Si hace falta, vuelve a desplegar el commit anterior (§9).

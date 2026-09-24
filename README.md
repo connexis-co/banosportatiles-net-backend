@@ -1,8 +1,15 @@
 # banosportatiles.net — backend (WordPress headless)
 
 WordPress 7.x **solo como CMS/API** en `admin.banosportatiles.net`. El sitio público es Astro 7 en Cloudflare
-(`https://banosportatiles.net`), que consume la API `bp/v1` en el build y para las previews, y envía los leads
-firmados con HMAC. Plan y contrato: [`docs/plans/2026-09-22_reestructuracion-headless.md`](../docs/plans/2026-09-22_reestructuracion-headless.md).
+(`https://banosportatiles.net`), que consume la API `bp/v1` en el build y para las previews, y envía los leads,
+los votos y las opiniones firmados con HMAC. Planes y contratos:
+[`2026-09-22_reestructuracion-headless.md`](../docs/plans/2026-09-22_reestructuracion-headless.md) y
+[`2026-09-24_valoraciones-toc-rankmath-precios.md`](../docs/plans/2026-09-24_valoraciones-toc-rankmath-precios.md)
+(valoraciones, precios, TOC, Rank Math, menús, marca e imágenes).
+
+Plugins de wordpress.org: Secure Custom Fields, Redirection, Nested Pages, Two Factor y, desde la 1.1.0,
+**Site Reviews** (motor de valoraciones), **Rank Math** (SEO) y **Safe SVG** (logo SVG). bp-headless funciona sin
+los tres últimos: sin Site Reviews el Node omite `rating`/`reviews`; sin Rank Math el SEO sale de SCF.
 
 ```
 backend/
@@ -27,8 +34,8 @@ cd ~/dev/banosportatiles-net/backend   # (también accesible por el symlink de ~
 bin/setup.sh            # idempotente: .env con secretos aleatorios → contenedores → WP instalado → seed importado
 composer install        # Pest, Pint, PHPStan (dev)
 composer check          # pint --test + phpstan (nivel 8) + pest
-tests/smoke.sh          # 110 comprobaciones end-to-end contra el Docker levantado
-deploy/cloudpanel/sim/run.sh   # deploy a CloudPanel simulado en Docker (14 comprobaciones)
+tests/smoke.sh          # 170 comprobaciones end-to-end contra el Docker levantado (con el seed-sample)
+deploy/cloudpanel/sim/run.sh   # deploy a CloudPanel simulado en Docker (17 comprobaciones)
 ```
 
 | URL | Qué |
@@ -47,13 +54,25 @@ docker compose run --rm wpcli wp bp deploy         # dispara el deploy hook ahor
 docker compose run --rm wpcli wp bp cache flush    # vacía la caché de la API
 docker compose run --rm wpcli wp bp preview-url 12 # URL de preview firmada (15 min)
 docker compose run --rm wpcli wp bp leads resend 42 [--failed]   # reenvía el email de leads (p. ej. email_failed)
+docker compose run --rm wpcli wp bp setup reviews                # Site Reviews para headless (idempotente)
+docker compose run --rm wpcli wp bp setup rankmath               # Rank Math para headless (idempotente)
+docker compose run --rm wpcli wp bp seo migrate-rankmath [--dry-run] [--force]   # SEO de SCF → Rank Math
+docker compose run --rm wpcli wp bp reviews stats [--all]        # votos, promedio, opiniones y pendientes por página
+docker compose run --rm wpcli wp bp reviews purge --voter=<hash>|--ip=<ip> [--uri=/ruta/] [--dry-run] [--yes]
 bin/sync.sh                                        # en modo sync: copia el código al contenedor
 bin/reset.sh --yes                                 # borra BD + uploads locales y vuelve a montar todo
 deploy/package.sh                                  # zips del plugin/tema + export de BD/uploads (URL → admin.banosportatiles.net)
 deploy/cloudpanel/deploy.sh --dry-run              # deploy a producción (connexis-prod): ver deploy/README.md
 ```
 
-Para importar el seed real del frontend: `BP_SEED_DIR=../frontend/<carpeta-con-bundle.json-y-assets> bin/setup.sh`.
+Para importar el seed real del frontend (el `BP_SEED_DIR` de la línea de comandos manda sobre el de `.env`):
+
+```bash
+(cd ../frontend && pnpm seed:bundle --out ../backend/dist/seed-front)   # bundle.json + assets/ (dist/ está en .gitignore)
+BP_SEED_DIR=./dist/seed-front bin/reset.sh --yes     # WordPress limpio solo con el seed del frontend
+# o, sobre el WordPress actual (upsert idempotente; imágenes deduplicadas por SHA-1):
+BP_SEED_DIR=./dist/seed-front docker compose run --rm wpcli wp bp import-seed /opt/bp/seed/bundle.json --assets=/opt/bp/seed/assets --no-deploy
+```
 
 > **Montajes y macOS.** El código vive en `~/dev/banosportatiles-net/backend` y los scripts resuelven siempre la ruta física
 > (`pwd -P`), así que Docker monta el plugin y el tema **en vivo**. Si el repo se clona dentro de `~/Documents`, Docker Desktop
@@ -80,7 +99,10 @@ una raíz de composición (`Plugin::boot()`) que registra módulos `Hookable`.
 | `Leads/` | Validación pura, rate limit con transients, repositorio CPT, email (`wp_mail`) y webhook firmado vía WP-Cron |
 | `Security/` | HMAC, tokens de preview, XML-RPC/emojis/oEmbed off, comentarios off (UI + REST), `/wp/v2/users` con auth, headers de seguridad en el admin |
 | `Headless/` | Redirección 301 del front al sitio público, `noindex` total del host y links de preview al front |
-| `Deploy/` | Deploy hook con debounce de 60 s (WP-Cron), botón «Publicar cambios en el sitio» y widget del dashboard |
+| `Deploy/` | Deploy hook con debounce por tipo de cambio (60 s contenido, ventana de 15 min reseñas), rebuild diario programable, botón «Publicar cambios en el sitio» y widget del dashboard |
+| `Reviews/` | Valoraciones y opiniones: `ReviewsGateway` (`SiteReviewsGateway` / `NullReviewsGateway`), política por tipo y por página, resumen y normalizador puros, validación, bloqueo de las vías públicas de Site Reviews, invalidación + deploy, columna «Valoración» |
+| `Seo/` | `SeoNormalizer` elige la fuente: `RankMathSeoSource` (meta `rank_math_*` + plantillas y variables de Rank Math) o `ScfSeoSource`; canonical público, setup de Rank Math y migración SCF → Rank Math |
+| `Svg/` | `SvgSanitizer`: SVG del logo seguro para incrustar (Safe SVG + lista blanca propia con DOM) |
 | `Import/` + `Cli/` | `wp bp import-seed` (upsert idempotente en dos pasadas + sideload de imágenes) y comandos de soporte |
 | `Admin/`, `Mail/` | Columnas Plantilla/URI, admin de leads con estado comercial, aviso headless y SMTP opcional (Mailpit en local) |
 
@@ -150,13 +172,18 @@ camelCase. Las imágenes son `{src, width, height, alt}` con `src` absoluto al C
 
 | Método y ruta | Auth | Respuesta |
 |---|---|---|
-| `GET /site` | pública | ajustes, menús, banner de venta, contacto, legal, analítica, `ciudades[]`, `categorias[]` |
+| `GET /site` | pública | marca (logo SVG saneado), cabecera, menús (principal, secundario, footer), banner de venta, contacto, legal, analítica, formularios, `ciudades[]`, `categorias[]`, `ratings`, `toc`, `microcopy`, `seo` |
 | `GET /routes` | pública | `[{uri, type, id, template, modified, noindex}]` |
 | `GET /content?type=page\|post\|equipo&page=1&per_page=50` | pública | `Node[]` + `X-WP-Total` / `X-WP-TotalPages` (máx. 100 por página) |
 | `GET /node?uri=/ruta/` | pública; `?token=` → borradores | un `Node` (`404` si no está publicado; `400` sin `uri`) |
 | `GET /faqs` | pública | `[{id, q, a, temas[]}]` |
 | `GET /redirects` | pública | `[{from, to, code}]` (Redirection, sin regex) |
 | `POST /leads` | HMAC | `201 {ok, reference}` · `401` firma · `422` validación · `429` límite · `503` sin secreto |
+| `GET /ratings` | pública | `[{uri, id, ...rating}]` de los nodos con valoraciones habilitadas |
+| `GET /ratings?uri=/ruta/` | pública | `{uri, id, ...rating}` · `404` · `403 {code: "ratings_disabled"}` |
+| `GET /reviews?uri=/ruta/&page=1&per_page=10` | pública | `Review[]` + `X-WP-Total` / `X-WP-TotalPages` (máx. 50) · `403 {code: "reviews_disabled"}` · `404` |
+| `POST /ratings` | HMAC | `{uri, rating 1–5, voter, ip, ua?, country?}` → `201 {ok, created: true, summary}` · `200 {ok, created: false, duplicate: true, summary}` · `403` · `404` · `422 {errors}` · `429` · `503` |
+| `POST /reviews` | HMAC | `{uri, rating, title?, content 20–2000, name 2–60, email, consent: true, voter, ip, ua?}` → `201 {ok, id, status: pending\|approved[, updated: true]}` · `409 {code: "duplicate"}` · `403` · `404` · `422 {errors}` · `429` · `503` |
 
 ### Ejemplos (salida real del seed de ejemplo, recortada)
 
@@ -232,6 +259,34 @@ Una preview añade `"preview": true`.
 
 `GET /redirects` → `[{"from": "/medellin/", "to": "/alquiler-de-banos-portatiles/medellin/", "code": 301}]`
 
+### Campos nuevos del Node y de `/site` (1.1.0, contrato §3 del plan 2026-09-24)
+
+**Node** (en `/content` y `/node`; los opcionales se omiten, nunca van en `null`: lo verifica una prueba de contrato):
+
+| Clave | Cuándo | Forma |
+|---|---|---|
+| `seo` | siempre | `{title, description, canonical?, noindex, nofollow?, robots?, ogTitle?, ogDescription?, ogImage?, twitterTitle?, twitterDescription?, twitterImage?, twitterCard?, keyword?, keywords?, breadcrumbTitle?, source: "rankmath"\|"bp"}`. El canonical es una URL pública absoluta (se traduce `admin.` y `www.` a `banosportatiles.net`) y se omite si apunta al propio nodo. Los robots vienen del post o de los valores por defecto de su tipo, nunca del `noindex` del host del CMS |
+| `price` | hub-servicio, servicio, ciudad y equipo con «Mostrar precio» y datos coherentes | `{mode: from\|fixed\|range, amount? \| min?, max?, currency: "COP", unit?: {code, label}, taxIncluded, validUntil?, updated?, note?, availability}` |
+| `schemaType` | siempre | `auto` \| `service` \| `product` (`auto` fuera de servicios, ciudades y equipos) |
+| `rating` | si la página tiene estrellas u opiniones | `{stars, reviews, count, average, best: 5, worst: 1, distribution: {"1".."5"}, reviewCount, updated?}` |
+| `reviews` | si la página admite opiniones con texto | últimas 10 aprobadas: `[{id, author, initials, rating, title?, content, date, response?: {content, date?, author}}]`, en texto plano con saltos de línea y sin email ni IP |
+| `toc` | siempre | configuración resuelta: `{enabled, title, depth: 2\|3, min, numbered, collapsedMobile, sticky, exclude[], labels: {id: etiqueta}}` |
+
+**`/site`**: `brand.logo` y `brand.logo_dark` (`Image & {svg?}`: si el archivo es SVG, el marcado saneado, máx. 100 KB),
+`header {cta_label, cta_short, cta_href}`, `menus.header[]` con `icon?`, `kind` (`links`, `ciudades`, `servicios` o `blog`) e
+hijos con `icon?` y `group?`, `menus.secondary[] {label, href, icon?}`, `ciudades[].region?`, `legal.telefono`,
+`ratings {enabled, types, minCountForSchema, autoApproveReviews, texts}`, `toc {enabled_types, title, titleBlog, depth, depthBlog?, min, numbered, collapsedMobile, sticky}`,
+`microcopy` (los textos vacíos se omiten para que el front use los suyos) y `seo {siteName, separator, defaultOgImage?}` (de Rank Math si está activo).
+
+**Valoraciones y opiniones** (Site Reviews detrás de `Reviews\ReviewsGateway`):
+- Cada voto rápido es una reseña **solo con estrellas**: se aprueba sola, va a la categoría «Calificación» y no manda email al admin.
+- Cada opinión lleva texto, va a la categoría «Comentario» y queda **pendiente** salvo que esté activo «Aprobar opiniones automáticamente». Site Reviews avisa al admin.
+- Si un votante que ya votó en esa página deja una opinión, su voto **se actualiza**: pasa a opinión y vuelve a moderación.
+- **Deduplicación** por (página, `voter`) durante 180 días, con la meta `_bp_voter` y un bloqueo `GET_LOCK`. También aplica la lista negra de Site Reviews o de WordPress.
+- **Política** (Ajustes del sitio → Valoraciones): un interruptor general y, para cada tipo (servicios, ciudades, equipos, blog y otras), estrellas y opiniones por separado. Cada página tiene además su caja lateral «Valoraciones» (heredar, sí o no).
+  - Inicio, legales, contacto, cotizar, venta e índice del blog no tienen valoraciones salvo que una página las active.
+- **Seguridad**: la única vía de escritura pública es `POST /ratings` y `/reviews` firmados, con el mismo esquema y secreto que `/leads` y un límite por IP de 30 votos y 5 opiniones cada 10 min. Quedan cerradas todas las vías de Site Reviews: su REST `submissions`, las rutas `submit-review` de admin-ajax y del POST en `init`, y las inserciones de `site-review` que no vengan de bp-headless, WP-CLI o un editor.
+
 ### `POST /leads` (servidor a servidor, desde la Astro Action)
 
 Headers: `Content-Type: application/json`, `X-BP-Timestamp: <unix segundos>`,
@@ -296,7 +351,10 @@ autoguardado más reciente (título, contenido y extracto; los campos SCF se lee
 ### Deploy hook
 
 Cualquier cambio publicado (páginas, posts, equipos, FAQs, términos, ajustes o redirecciones) programa **un** POST al
-deploy hook 60 s después, reiniciando el contador con cada cambio (debounce). El admin incluye el botón «Publicar cambios en el
+deploy hook 60 s después, reiniciando el contador con cada cambio (debounce). Los cambios de reseñas visibles en el sitio
+(voto aprobado, aprobar, desaprobar, editar o borrar una aprobada, responder) abren una **ventana de 15 min** que no se
+reinicia; un deploy ya en cola los incluye. Las opiniones pendientes solo vacían la caché. «Ajustes del sitio → Despliegue →
+Rebuild diario» (activo por defecto a las 04:00, hora del sitio) refresca el `AggregateRating` del JSON-LD aunque nadie edite. El admin incluye el botón «Publicar cambios en el
 sitio» en la barra superior y un widget del dashboard con el último disparo, su resultado y el siguiente programado.
 
 ## Seed → WordPress
@@ -308,20 +366,32 @@ sitio» en la barra superior y un widget del dashboard con el último disparo, s
 - Si el hash del ítem no cambió, lo salta (`--force` reescribe todo). Una segunda pasada deja «0 creados, 0 actualizados».
 - **Pasada 1:** ciudades → categorías → FAQs → ajustes → redirecciones → equipos → posts → páginas (por profundidad; padre por `parentUri`, `menu_order` por `order`, plantilla por `template`).
 - **Pasada 2:** relaciones (secciones, FAQs del banco, pilares y relacionados del blog, pilar de cada categoría) y portada (`/`).
-- Imágenes: `image`, `hero.image`, galerías, `og_image` y `<img>` locales dentro de `contentHtml` se suben a la biblioteca (deduplicadas por SHA-1) desde `--assets`.
+- Imágenes: `image`, `hero.image`, galerías, `og_image`, las imágenes de sección (`image` de steps, cta_banner, rich_text, features_grid y pricing_factors, e `image` de cada ítem de steps y features_grid) y las `<img>` locales dentro de `contentHtml` (con `<figure>`/`<figcaption>` intactos) se suben a la biblioteca desde `--assets` (p. ej. `images/generated/x.jpg`), deduplicadas por SHA-1 (meta `_bp_source_sha1`) y con el `alt` del seed.
+- `site.yaml`: además de marca, contacto, legal, analítica, formularios y menús, importa `header`, `menus.secondary`, `microcopy`, `ratings` y `toc`; `ciudades.yaml` importa `region`.
+- Por página: `price`, `schema_type`, `toc` y `rating: false` se escriben **solo si el seed los trae** (si no, se conserva lo configurado en WordPress). El seed no trae precios ni valoraciones.
+- Con Rank Math activo, el SEO del seed también se escribe en los meta `rank_math_*`, y `site.seo` (`siteName`, `separator`) en «Títulos y meta» (la fuente de `/site → seo`). `wp bp setup rankmath` solo pone el separador «|» y el nombre de la marca la primera vez: después mandan el editor y el seed.
 
 ## Calidad
 
 | Herramienta | Resultado |
 |---|---|
-| `vendor/bin/pest` | 158 tests / 591 aserciones (HtmlCleaner, Slugger, UriResolver, HMAC, PreviewToken, validación, email y rate limit de leads, normalizadores, ciudades, round-trip seed → SCF → API, grupos SCF, bundle, HTTP/CORS, SMTP, flags; aviso de venta: saneamiento, E.164, contraste WCAG, forma del REST y exclusión de rutas) |
+| `vendor/bin/pest` | 280 tests / 1264 aserciones (HtmlCleaner, Slugger, UriResolver, HMAC, PreviewToken, validación, email y rate limit de leads, normalizadores, ciudades, round-trip seed → SCF → API, grupos SCF, bundle, HTTP/CORS, SMTP, flags; aviso de venta: saneamiento, E.164, contraste WCAG, forma del REST y exclusión de rutas; 1.1.0: resumen, reseñas, política y controladores HMAC de valoraciones (401, 422, 429, 403, 409, duplicado, actualización del voto), precios, TOC, fuentes de SEO con Rank Math simulado, canonical, migración a Rank Math, `site.seo` → Rank Math y setup sin pisar al editor, sanitizador SVG, menús/textos/regiones, imágenes de sección, deduplicación de medios, debounce del deploy y contrato del Node sin `null`) |
 | `vendor/bin/pint --test` | preset laravel + `declare_strict_types` |
 | `vendor/bin/phpstan` | **nivel 8**, `phpVersion` 8.3, con stubs de WordPress, SCF/ACF y WP-CLI, sin baseline ni ignores |
-| `tests/smoke.sh` | 110 comprobaciones end-to-end (endpoints, forma del JSON, ETag/304, invalidación, leads 201/401/422/429, replay, email del lead con To/Cc/Reply-To/HTML, `BP_LEADS_EMAIL=false`, fallo SMTP → `email_failed` → `leads resend`, SMTP con STARTTLS + AUTH obligatorios, webhook firmado, 301 del front, robots, previews, hardening, CORS, deploy hook, aviso de venta: forma, 304, `?path`, fuente única con `/site`, guardar y publicar desde el admin) |
-| `deploy/cloudpanel/sim/run.sh` | 14 comprobaciones del deploy real contra un CloudPanel simulado (pasada nueva + idempotente) |
+| `tests/smoke.sh` | 170 comprobaciones end-to-end (endpoints, forma del JSON, ETag/304, invalidación, leads 201/401/422/429, replay, email del lead con To/Cc/Reply-To/HTML, `BP_LEADS_EMAIL=false`, fallo SMTP → `email_failed` → `leads resend`, SMTP con STARTTLS + AUTH obligatorios, webhook firmado, 301 del front, robots, previews, hardening, CORS, deploy hook, aviso de venta: forma, 304, `?path`, fuente única con `/site`, guardar y publicar desde el admin; 1.1.0: plugins y setups idempotentes, ningún `null`, `/site` y Node nuevos, `/ratings` y `/reviews` (304, 403, 404, 400), voto 201 → duplicado 200 → visible en Site Reviews con su categoría y deploy en ventana, opinión 201 pendiente → 409 → actualización del voto, email fuera de la API, vías públicas de Site Reviews cerradas y limpieza con `wp bp reviews purge`) |
+| `deploy/cloudpanel/sim/run.sh` | 17 comprobaciones del deploy real contra un CloudPanel simulado (pasada nueva, idempotente y `--seed-force`; plugins nuevos, setups y nombre del sitio en Rank Math) |
 
 ## Despliegue
 
 Producción: `https://admin.banosportatiles.net` en **connexis-prod** (Hetzner + CloudPanel), con
 `deploy/cloudpanel/deploy.sh` (idempotente, `--dry-run`). Ver [`deploy/README.md`](deploy/README.md): DNS y proxy de Cloudflare,
 IP autorizada en Brevo, secretos en `backend/.env.deploy`, vhost, cron real, verificación, backups y rollback.
+
+### Deploy de la 1.1.0 (valoraciones, precios, TOC, Rank Math, menús e imágenes)
+
+`deploy/cloudpanel/deploy.sh` ya instala y activa Site Reviews, Rank Math y Safe SVG y corre `wp bp setup reviews` y
+`wp bp setup rankmath` (idempotentes). Después, **una sola vez**: `wp bp seo migrate-rankmath` (copia el SEO de SCF a Rank
+Math sin pisar lo que ya tenga) y reimportar el seed del frontend con `deploy.sh --seed=<carpeta del bundle> --seed-force`
+(el importador aprendió campos nuevos: sin `--seed-force` saltaría los ítems cuyo YAML no cambió). Rollback:
+desactivar los plugins nuevos; bp-headless sigue funcionando (SEO desde SCF y sin `rating`). Comandos exactos en
+[`deploy/README.md` §10](deploy/README.md#10-actualización-a-la-110-valoraciones-precios-toc-rank-math-menús-e-imágenes).
