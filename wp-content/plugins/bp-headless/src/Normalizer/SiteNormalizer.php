@@ -54,6 +54,7 @@ final class SiteNormalizer
             'ciudades' => $this->ciudades(),
             'categorias' => $this->categorias(),
             'ratings' => $this->ratings->settings()->toSite($this->ratings->available()),
+            'toc' => TocResolver::site($this->fields->get('toc', Config::OPTIONS_ID)),
         ];
 
         // Single source of truth: the «Sitio en venta» plugin (bp-sitio-en-venta). Omitted when it is not active.

@@ -87,7 +87,7 @@ final class FieldBuilder
     }
 
     /**
-     * @param  array<string, string>  $choices
+     * @param  array<array-key, string>  $choices  Numeric keys ("2", "3") become ints in PHP arrays.
      * @param  array<string, mixed>  $extra
      * @return array<string, mixed>
      */

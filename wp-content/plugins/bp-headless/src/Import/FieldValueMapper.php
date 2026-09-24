@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace BanosPortatiles\Headless\Import;
 
 use BanosPortatiles\Headless\Normalizer\PriceNormalizer;
+use BanosPortatiles\Headless\Normalizer\TocResolver;
 use BanosPortatiles\Headless\Routing\UriResolver;
 use BanosPortatiles\Headless\Support\Arr;
 
@@ -213,6 +214,41 @@ final class FieldValueMapper
             'updated' => PriceNormalizer::date(Arr::string($price, 'updated')) ?? '',
             'note' => Arr::string($price, 'note'),
             'availability' => isset(PriceNormalizer::AVAILABILITY[Arr::string($price, 'availability')]) ? Arr::string($price, 'availability') : 'InStock',
+        ];
+    }
+
+    /**
+     * Seed "toc" of a page/post/equipo → SCF group "toc"; null when absent (the importer keeps the editor's
+     * settings). Accepts {mode: show|hide|inherit} or {enabled: bool}, title, depth, exclude[] and labels {id: label}.
+     *
+     * @param  array<array-key, mixed>  $item
+     * @return array<string, mixed>|null
+     */
+    public function toc(array $item): ?array
+    {
+        if (! isset($item['toc']) || ! is_array($item['toc'])) {
+            return null;
+        }
+        $toc = $item['toc'];
+        $mode = Arr::string($toc, 'mode');
+        if (! isset(TocResolver::MODES[$mode])) {
+            $mode = array_key_exists('enabled', $toc) ? (Arr::bool($toc, 'enabled') ? 'show' : 'hide') : 'inherit';
+        }
+        $labels = [];
+        foreach (Arr::array($toc, 'labels') as $id => $label) {
+            $pair = is_array($label) ? [Arr::string($label, 'id'), Arr::string($label, 'label')] : [(string) $id, is_scalar($label) ? trim((string) $label) : ''];
+            if ($pair[0] !== '' && $pair[1] !== '') {
+                $labels[] = ['id' => ltrim($pair[0], '#'), 'label' => $pair[1]];
+            }
+        }
+        $depth = TocResolver::depth($toc['depth'] ?? null);
+
+        return [
+            'mode' => $mode,
+            'title' => Arr::string($toc, 'title'),
+            'depth' => $depth !== null ? (string) $depth : 'inherit',
+            'exclude' => implode("\n", Arr::strings($toc, 'exclude')),
+            'labels' => $labels,
         ];
     }
 

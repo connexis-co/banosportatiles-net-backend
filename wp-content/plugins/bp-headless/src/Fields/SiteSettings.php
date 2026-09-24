@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace BanosPortatiles\Headless\Fields;
 
 use BanosPortatiles\Headless\Config;
+use BanosPortatiles\Headless\Normalizer\TocResolver;
 use BanosPortatiles\Headless\Reviews\RatingPolicy;
 use BanosPortatiles\Headless\Reviews\RatingSettings;
 
@@ -110,6 +111,22 @@ final class SiteSettings
             $f->tab('tab_ratings', 'Valoraciones'),
             $f->group('ratings', 'Valoraciones y opiniones', self::ratingsFields(...), [
                 'instructions' => 'Votos con estrellas y opiniones con texto (plugin Site Reviews). Las opiniones se moderan en «Reseñas».',
+            ]),
+
+            $f->tab('tab_toc', 'Tabla de contenidos'),
+            $f->group('toc', 'Tabla de contenidos', static fn (FieldBuilder $t): array => [
+                $t->checkbox('enabled_types', 'Mostrar en', TocResolver::TYPES, [
+                    'default_value' => TocResolver::DEFAULT_TYPES,
+                    'layout' => 'vertical',
+                    'instructions' => 'Cada página puede mostrarla u ocultarla en su caja «Tabla de contenidos».',
+                ]),
+                $t->text('title', 'Título', ['default_value' => TocResolver::DEFAULT_TITLE]),
+                $t->text('title_blog', 'Título en el blog', ['default_value' => TocResolver::DEFAULT_TITLE_BLOG]),
+                $t->select('depth', 'Niveles', ['2' => 'Solo H2', '3' => 'H2 y H3'], ['default_value' => (string) TocResolver::DEFAULT_DEPTH]),
+                $t->number('min', 'Mínimo de encabezados para mostrarla', ['default_value' => TocResolver::DEFAULT_MIN, 'min' => 1, 'step' => 1]),
+                $t->trueFalse('numbered', 'Numerada'),
+                $t->trueFalse('collapsed_mobile', 'Cerrada por defecto en móvil', ['default_value' => 1]),
+                $t->trueFalse('sticky', 'Fija en la columna lateral (escritorio)', ['default_value' => 1]),
             ]),
 
             $f->tab('tab_deploy', 'Despliegue'),

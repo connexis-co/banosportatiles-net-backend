@@ -7,6 +7,7 @@ namespace BanosPortatiles\Headless\Fields;
 use BanosPortatiles\Headless\Content\PostTypes;
 use BanosPortatiles\Headless\Content\Taxonomies;
 use BanosPortatiles\Headless\Normalizer\PriceNormalizer;
+use BanosPortatiles\Headless\Normalizer\TocResolver;
 use BanosPortatiles\Headless\Reviews\RatingPolicy;
 
 /**
@@ -33,6 +34,7 @@ final class FieldGroups
             self::price(),
             self::blog(),
             self::equipo(),
+            self::toc(),
             self::seo(),
             self::ratings(),
             self::ciudad(),
@@ -101,6 +103,29 @@ final class FieldGroups
                 'instructions' => 'Automático recomendado: Google muestra estrellas y precio para Product, no para Service.',
             ]),
         ], ['menu_order' => 3]);
+    }
+
+    /**
+     * «Tabla de contenidos» of a page, post or equipo: overrides «Ajustes del sitio → Tabla de contenidos».
+     *
+     * @return array<string, mixed>
+     */
+    public static function toc(): array
+    {
+        $f = new FieldBuilder;
+
+        return self::group('toc', 'Tabla de contenidos', self::postTypes(['page', 'post', PostTypes::EQUIPO]), [
+            $f->group('toc', 'Tabla de contenidos', static fn (FieldBuilder $t): array => [
+                $t->select('mode', 'Mostrar la tabla', TocResolver::MODES, ['default_value' => 'inherit']),
+                $t->text('title', 'Título', ['instructions' => 'Vacío = el de Ajustes del sitio («En esta página» o «Contenido de la guía» en el blog).']),
+                $t->select('depth', 'Niveles', ['inherit' => 'Heredar', '2' => 'Solo H2', '3' => 'H2 y H3'], ['default_value' => 'inherit']),
+                $t->textarea('exclude', 'Encabezados excluidos', ['instructions' => 'Uno por línea: el texto del encabezado o su id (p. ej. preguntas-frecuentes).']),
+                $t->repeater('labels', 'Etiquetas cortas', static fn (FieldBuilder $l): array => [
+                    $l->text('id', 'Id del encabezado', ['instructions' => 'p. ej. cuanto-cuesta']),
+                    $l->text('label', 'Etiqueta en la tabla'),
+                ], ['button_label' => 'Añadir etiqueta']),
+            ]),
+        ], ['menu_order' => 80]);
     }
 
     /**
