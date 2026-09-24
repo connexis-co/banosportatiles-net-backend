@@ -181,3 +181,12 @@ it('keeps paragraphs and line breaks in the owner response stored by Site Review
     expect($review['content'])->toBe("Primera línea\nSegunda línea")
         ->and($review['response']['content'])->toBe("Gracias por comentar.\n\nSaludos.");
 });
+
+it('exposes a stars title per content type with its own default', function (): void {
+    $site = RatingSettings::fromOption(['texts' => ['stars_title_blog' => '¿Te sirvió esta guía?']])->toSite(true);
+
+    expect($site['texts']['starsTitleBlog'])->toBe('¿Te sirvió esta guía?')
+        ->and($site['texts']['starsTitleServicios'])->toBe('Califica este servicio')
+        ->and($site['texts']['starsTitleEquipos'])->toBe('Califica este equipo')
+        ->and($site['texts']['starsTitle'])->toBe(RatingSettings::DEFAULT_TEXTS['starsTitle']);
+});

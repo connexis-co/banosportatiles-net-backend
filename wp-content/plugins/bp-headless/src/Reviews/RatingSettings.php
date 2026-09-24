@@ -36,6 +36,10 @@ final readonly class RatingSettings
     /** API key (camelCase) → SCF field name (snake_case). */
     public const TEXT_FIELDS = [
         'starsTitle' => 'stars_title',
+        'starsTitleServicios' => 'stars_title_servicios',
+        'starsTitleCiudades' => 'stars_title_ciudades',
+        'starsTitleEquipos' => 'stars_title_equipos',
+        'starsTitleBlog' => 'stars_title_blog',
         'starsHelp' => 'stars_help',
         'firstVote' => 'first_vote',
         'thanks' => 'thanks',
@@ -49,6 +53,10 @@ final readonly class RatingSettings
     /** @var array<string, string> UI texts (same defaults as the seed, site.yaml → ratings.texts). */
     public const DEFAULT_TEXTS = [
         'starsTitle' => 'Califica esta página',
+        'starsTitleServicios' => 'Califica este servicio',
+        'starsTitleCiudades' => 'Califica el servicio en esta ciudad',
+        'starsTitleEquipos' => 'Califica este equipo',
+        'starsTitleBlog' => '¿Te fue útil esta guía?',
         'starsHelp' => 'Elige de 1 a 5 estrellas.',
         'firstVote' => 'Sé el primero en calificar',
         'thanks' => '¡Gracias! Registramos tu calificación.',

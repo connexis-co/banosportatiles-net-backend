@@ -243,7 +243,11 @@ final class SiteSettings
                 'instructions' => 'Apagado (recomendado): cada opinión con texto espera moderación en «Reseñas». Los votos con estrellas se aprueban solos.',
             ]),
             $r->group('texts', 'Textos de la interfaz', static fn (FieldBuilder $x): array => [
-                $x->text('stars_title', 'Título del bloque de estrellas', ['default_value' => RatingSettings::DEFAULT_TEXTS['starsTitle']]),
+                $x->text('stars_title', 'Título del bloque de estrellas (general)', ['default_value' => RatingSettings::DEFAULT_TEXTS['starsTitle']]),
+                $x->text('stars_title_servicios', 'Título en servicios', ['default_value' => RatingSettings::DEFAULT_TEXTS['starsTitleServicios']]),
+                $x->text('stars_title_ciudades', 'Título en ciudades', ['default_value' => RatingSettings::DEFAULT_TEXTS['starsTitleCiudades']]),
+                $x->text('stars_title_equipos', 'Título en equipos', ['default_value' => RatingSettings::DEFAULT_TEXTS['starsTitleEquipos']]),
+                $x->text('stars_title_blog', 'Título en guías del blog', ['default_value' => RatingSettings::DEFAULT_TEXTS['starsTitleBlog']]),
                 $x->text('stars_help', 'Ayuda bajo las estrellas', ['default_value' => RatingSettings::DEFAULT_TEXTS['starsHelp']]),
                 $x->text('first_vote', 'Texto sin votos todavía', ['default_value' => RatingSettings::DEFAULT_TEXTS['firstVote']]),
                 $x->text('thanks', 'Mensaje después de votar', ['default_value' => RatingSettings::DEFAULT_TEXTS['thanks']]),
