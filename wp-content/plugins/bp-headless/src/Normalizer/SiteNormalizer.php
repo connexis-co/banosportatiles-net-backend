@@ -7,6 +7,7 @@ namespace BanosPortatiles\Headless\Normalizer;
 use BanosPortatiles\Headless\Config;
 use BanosPortatiles\Headless\Content\Taxonomies;
 use BanosPortatiles\Headless\Fields\FieldReader;
+use BanosPortatiles\Headless\Reviews\RatingService;
 use BanosPortatiles\Headless\Routing\UriResolver;
 use BanosPortatiles\Headless\Support\Arr;
 
@@ -20,6 +21,7 @@ final class SiteNormalizer
         private readonly ReferenceResolver $refs,
         private readonly UriResolver $uris,
         private readonly CiudadNormalizer $ciudades,
+        private readonly RatingService $ratings,
     ) {}
 
     /**
@@ -51,6 +53,7 @@ final class SiteNormalizer
             ],
             'ciudades' => $this->ciudades(),
             'categorias' => $this->categorias(),
+            'ratings' => $this->ratings->settings()->toSite($this->ratings->available()),
         ];
 
         // Single source of truth: the «Sitio en venta» plugin (bp-sitio-en-venta). Omitted when it is not active.

@@ -9,6 +9,7 @@ use BanosPortatiles\Headless\Content\PostTypes;
 use BanosPortatiles\Headless\Content\Taxonomies;
 use BanosPortatiles\Headless\Fields\FieldReader;
 use BanosPortatiles\Headless\Html\ContentRenderer;
+use BanosPortatiles\Headless\Reviews\RatingService;
 use BanosPortatiles\Headless\Routing\UriResolver;
 use BanosPortatiles\Headless\Support\Arr;
 
@@ -34,6 +35,7 @@ final class NodeNormalizer
         private readonly SectionsNormalizer $sections,
         private readonly FaqNormalizer $faqs,
         private readonly CiudadNormalizer $ciudades,
+        private readonly RatingService $ratings,
     ) {}
 
     /**
@@ -94,6 +96,8 @@ final class NodeNormalizer
         if ($type === PostTypes::EQUIPO) {
             $node['equipo'] = $this->equipo($id);
         }
+        // "rating" and "reviews" only when this node has ratings (Site Reviews active + policy).
+        $node += $this->ratings->forNode($post);
         if ($preview) {
             $node['preview'] = true;
         }

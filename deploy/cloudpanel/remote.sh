@@ -225,6 +225,8 @@ PHP
   wp plugin activate bp-headless bp-sitio-en-venta --quiet
   wp plugin activate "${INTEGRATIONS[@]}" --quiet
   wp redirection database install >/dev/null 2>&1 || true
+  # Idempotent configuration of the integrations for the headless site.
+  wp bp setup reviews >/dev/null && ok "Site Reviews configurado (wp bp setup reviews)"
   ok "bp-headless $(wp plugin get bp-headless --field=version) y bp-sitio-en-venta $(wp plugin get bp-sitio-en-venta --field=version) activos"
   ok "Site Reviews $(wp plugin get site-reviews --field=version), Rank Math $(wp plugin get seo-by-rank-math --field=version) y Safe SVG $(wp plugin get safe-svg --field=version) activos"
 

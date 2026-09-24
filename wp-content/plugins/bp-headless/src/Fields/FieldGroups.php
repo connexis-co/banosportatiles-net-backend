@@ -6,6 +6,7 @@ namespace BanosPortatiles\Headless\Fields;
 
 use BanosPortatiles\Headless\Content\PostTypes;
 use BanosPortatiles\Headless\Content\Taxonomies;
+use BanosPortatiles\Headless\Reviews\RatingPolicy;
 
 /**
  * SCF field groups of the content model (plan §4.3). Field names mirror the seed contract
@@ -31,6 +32,7 @@ final class FieldGroups
             self::blog(),
             self::equipo(),
             self::seo(),
+            self::ratings(),
             self::ciudad(),
             self::category(),
             SiteSettings::group(),
@@ -54,6 +56,25 @@ final class FieldGroups
                 $s->image('og_image', 'Imagen para redes (Open Graph)', ['instructions' => '1200 × 630 px.']),
             ]),
         ], ['menu_order' => 90]);
+    }
+
+    /**
+     * Per-post override of «Ajustes del sitio → Valoraciones» (sidebar), with the current summary and a link to
+     * the reviews of this post in Site Reviews (message filled by Reviews\ReviewsAdmin).
+     *
+     * @return array<string, mixed>
+     */
+    public static function ratings(): array
+    {
+        $f = new FieldBuilder;
+
+        return self::group('ratings', 'Valoraciones', self::postTypes(['page', 'post', PostTypes::EQUIPO]), [
+            $f->group('ratings', 'Valoraciones', static fn (FieldBuilder $r): array => [
+                $r->message('summary', 'Resumen', 'Publica la página para ver sus valoraciones.'),
+                $r->select('stars', 'Estrellas (votos rápidos)', RatingPolicy::OVERRIDES, ['default_value' => RatingPolicy::INHERIT]),
+                $r->select('reviews', 'Opiniones con texto', RatingPolicy::OVERRIDES, ['default_value' => RatingPolicy::INHERIT]),
+            ]),
+        ], ['position' => 'side', 'menu_order' => 5]);
     }
 
     /** @return array<string, mixed> */
