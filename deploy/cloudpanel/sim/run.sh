@@ -51,25 +51,31 @@ docker run -d --name bp-sim --network "container:$DB_CONTAINER" -e CLP_SIM_DB_RO
 printf 'SSH_HOST=bp-sim\nSERVER_IP=127.0.0.1\nSITE_USER=bp-sim-cms\nDB_NAME=bp-sim-cms\nDB_USER=bp-sim-cms\nBP_SMTP_USER=smtp-login@example.com\nBP_SMTP_PASS="k\x27ey\\\\with\$chars"\n' >"$ENV_FILE"
 chmod 600 "$ENV_FILE"
 
-for run in 1 2; do
+for run in 1 2 3; do
   bp_log "Deploy #$run"
-  SSH_BIN="$SIM_DIR/fake-ssh" deploy/cloudpanel/deploy.sh --env-file="$ENV_FILE" --seed=seed-sample >"$WORK/run$run.log" 2>&1 \
+  extra=()
+  [[ "$run" == "3" ]] && extra=(--seed-force)
+  SSH_BIN="$SIM_DIR/fake-ssh" deploy/cloudpanel/deploy.sh --env-file="$ENV_FILE" --seed=seed-sample ${extra[@]+"${extra[@]}"} >"$WORK/run$run.log" 2>&1 \
     || { tail -30 "$WORK/run$run.log"; exit 1; }
 done
 
 bp_log "Comprobaciones"
+grep -h 'Seed importado' "$WORK"/run*.log | sed 's/^/    /' || true
 check "segunda pasada idempotente (sitio, BD y WordPress ya existían)" "[[ \$(grep -c 'ya existe' '$WORK/run2.log') -ge 3 ]] && grep -q 'WordPress ya estaba instalado' '$WORK/run2.log'"
 check "seed idempotente (0 creados, 0 actualizados)" "grep -q '0 creados, 0 actualizados' '$WORK/run2.log'"
+check "--seed-force reescribe los ítems sin cambios (0 creados, N actualizados)" "grep -qE '0 creados, [1-9][0-9]* actualizados' '$WORK/run3.log'"
+check "wp bp setup reviews y wp bp setup rankmath en cada deploy" "[[ \$(cat '$WORK'/run*.log | grep -cE '(Site Reviews|Rank Math) configurado') == 6 ]]"
 check "vhost creado con la plantilla BP-Headless-WordPress-v1" "docker exec bp-sim grep -q 'bp-headless' /etc/nginx/sites-enabled/admin.banosportatiles.net.conf"
 check "wp-config.php 640 del usuario del sitio" "[[ \$(docker exec bp-sim stat -c '%U %a' $DOCROOT/wp-config.php) == 'bp-sim-cms 640' ]]"
 check "constantes BP_* y SMTP en wp-config" "[[ \$(docker exec bp-sim grep -cE \"define\\( '(BP_FRONTEND_URL|BP_LEADS_SECRET|BP_LEADS_EMAIL_TO|BP_SMTP_PASS|BP_SMTP_FROM_NAME)'\" $DOCROOT/wp-config.php) == 5 ]]"
 check "contraseña SMTP con comillas y \$ intacta" "[[ \$(simwp eval 'echo BP_SMTP_PASS;') == \"k'ey\\\\with\\\$chars\" ]]"
 check "contraseña del admin = WP_ADMIN_PASSWORD de .env.deploy" admin_password_ok
-check "plugins activos (SCF, Redirection, Nested Pages, Two Factor, bp-headless, bp-sitio-en-venta)" "[[ \$(simwp plugin list --status=active --field=name | sort | tr '\\n' ' ') == 'bp-headless bp-sitio-en-venta redirection secure-custom-fields two-factor wp-nested-pages ' ]]"
+check "plugins activos (SCF, Redirection, Nested Pages, Two Factor, Site Reviews, Rank Math, Safe SVG, bp-headless, bp-sitio-en-venta)" "[[ \$(simwp plugin list --status=active --field=name | sort | tr '\\n' ' ') == 'bp-headless bp-sitio-en-venta redirection safe-svg secure-custom-fields seo-by-rank-math site-reviews two-factor wp-nested-pages ' ]]"
 check "tema bp-headless-theme, es_CO, America/Bogota, noindex, /%postname%/" "[[ \$(simwp eval 'echo get_stylesheet(), \"|\", get_locale(), \"|\", get_option(\"timezone_string\"), \"|\", get_option(\"blog_public\"), \"|\", get_option(\"permalink_structure\");') == 'bp-headless-theme|es_CO|America/Bogota|0|/%postname%/' ]]"
 check "sin contenido de ejemplo" "[[ -z \$(simwp post list --post_type=post,page --name=hola-mundo --format=ids) ]]"
 check "API bp/v1/site responde" "[[ \$(simwp eval 'echo rest_do_request(new WP_REST_Request(\"GET\", \"/bp/v1/site\"))->get_status();') == 200 ]]"
 check "bp-venta/v1/config es el mismo objeto que /site → sale_banner" venta_same_object
+check "/site → seo.siteName es la marca del seed, no el título del CMS" "[[ \$(simwp eval 'echo rest_do_request(new WP_REST_Request(\"GET\", \"/bp/v1/site\"))->get_data()[\"seo\"][\"siteName\"];') == 'BañosPortátiles.net' ]]"
 check "cron real en el crontab del usuario del sitio" "docker exec bp-sim crontab -u bp-sim-cms -l | grep -q 'cron event run --due-now'"
 check "certificado solicitado con clpctl lets-encrypt:install:certificate" "docker exec bp-sim grep -q 'lets-encrypt:install:certificate' /var/lib/clp-sim/calls.log"
 

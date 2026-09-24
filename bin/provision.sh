@@ -7,7 +7,15 @@ say() { printf '  · %s\n' "$*"; }
 
 # WordPress.org answers 434 to requests whose User-Agent is "WordPress/x; http://localhost:8080",
 # so plugins and translations are fetched as public zips with wget and installed from file.
-fetch() { wget -q -T 90 -O "$2" "$1"; }
+fetch() { # fetch <url> <file>: up to 3 attempts (wordpress.org sometimes refuses a connection)
+  n=1
+  until wget -q -T 90 -O "$2" "$1"; do
+    [ "$n" -ge 3 ] && return 1
+    say "Retrying ($n/3): $1"
+    sleep $((n * 5))
+    n=$((n + 1))
+  done
+}
 
 install_plugin() {
   if ! wp plugin is-installed "$1"; then
@@ -56,7 +64,11 @@ wp option update default_ping_status closed --quiet
 wp option update users_can_register 0 --quiet
 
 say "Plugins from wordpress.org"
-for plugin in secure-custom-fields redirection wp-nested-pages two-factor; do
+# Integrations of bp-headless: site-reviews (ratings and reviews), seo-by-rank-math (SEO meta read by the API)
+# and safe-svg (sanitized SVG uploads for the brand logo). They are activated AFTER bp-headless so their
+# installers see the "equipo" post type.
+INTEGRATIONS="site-reviews seo-by-rank-math safe-svg"
+for plugin in secure-custom-fields redirection wp-nested-pages two-factor $INTEGRATIONS; do
   install_plugin "$plugin"
 done
 wp plugin activate secure-custom-fields redirection wp-nested-pages two-factor --quiet
@@ -70,6 +82,12 @@ for theme in $(wp theme list --status=inactive --field=name); do
   wp theme delete "$theme" --quiet
 done
 wp plugin activate bp-headless bp-sitio-en-venta --quiet
+
+say "Site Reviews, Rank Math and Safe SVG"
+# shellcheck disable=SC2086 # word splitting is intended
+wp plugin activate $INTEGRATIONS --quiet
+wp bp setup reviews >/dev/null
+wp bp setup rankmath >/dev/null
 
 say "Redirection database"
 wp redirection database install >/dev/null 2>&1 || true

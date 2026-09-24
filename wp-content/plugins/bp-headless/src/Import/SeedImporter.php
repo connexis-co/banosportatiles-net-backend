@@ -10,10 +10,12 @@ use BanosPortatiles\Headless\Content\Taxonomies;
 use BanosPortatiles\Headless\Fields\FieldBuilder;
 use BanosPortatiles\Headless\Redirects\RedirectionRepository;
 use BanosPortatiles\Headless\Routing\UriResolver;
+use BanosPortatiles\Headless\Seo\RankMathSeoWriter;
 use BanosPortatiles\Headless\Support\Arr;
 
 /**
- * Idempotent seed import (upsert by "_bp_seed_key"; unchanged items are skipped by content hash).
+ * Idempotent seed import (upsert by "_bp_seed_key"; unchanged items are skipped by content hash, which
+ * includes the SHA-1 of the local images they reference, so an image replaced in place is picked up).
  *
  * Pass 1: site options → ciudades → categorías → FAQs → redirects → equipos → posts → pages (by depth).
  * Pass 2: relations that need every object to exist (sections, FAQ refs, blog relations, category pillars).
@@ -46,6 +48,8 @@ final class SeedImporter implements SeedLookup
 
     private MediaImporter $media;
 
+    private AssetFingerprint $assets;
+
     private FieldValueMapper $mapper;
 
     private bool $dryRun = false;
@@ -55,9 +59,11 @@ final class SeedImporter implements SeedLookup
     public function __construct(
         private readonly UriResolver $uris,
         private readonly RedirectionRepository $redirects,
+        private readonly RankMathSeoWriter $rankMath,
     ) {
         $this->report = new ImportReport;
         $this->media = new MediaImporter(null, true, $this->report);
+        $this->assets = new AssetFingerprint($this->media->resolveLocal(...));
         $this->mapper = new FieldValueMapper($this);
     }
 
@@ -72,6 +78,7 @@ final class SeedImporter implements SeedLookup
         $this->dryRun = $dryRun;
         $this->force = $force;
         $this->media = new MediaImporter($assetsDir, $dryRun, $report);
+        $this->assets = new AssetFingerprint($this->media->resolveLocal(...));
         $this->mapper = new FieldValueMapper($this, $report->warn(...));
         $this->pages = $this->posts = $this->equipos = $this->faqs = $this->ciudades = $this->categories = [];
 
@@ -196,7 +203,7 @@ final class SeedImporter implements SeedLookup
         if ($site === []) {
             return;
         }
-        $hash = md5(serialize($site));
+        $hash = $this->assets->hash($site);
         if (! $this->force && get_option('bp_headless_seed_site_hash') === $hash) {
             $this->report->count('ajustes', 'unchanged');
 
@@ -217,6 +224,9 @@ final class SeedImporter implements SeedLookup
         if ($tagline !== '') {
             update_option('blogdescription', $tagline);
         }
+        $seo = Arr::array($site, 'seo');
+        $siteName = Arr::string($seo, 'siteName');
+        $this->rankMath->writeSite($siteName !== '' ? $siteName : $name, Arr::string($seo, 'separator'));
         update_option('bp_headless_seed_site_hash', $hash, false);
     }
 
@@ -429,7 +439,7 @@ final class SeedImporter implements SeedLookup
             default => $type,
         };
         $existing = $this->findBySeedKey($type, $seedKey) ?? $fallbackId;
-        $hash = md5(serialize($item));
+        $hash = $this->assets->hash($item);
 
         if ($existing !== null && ! $this->force && get_post_meta($existing, self::SEED_HASH, true) === $hash) {
             $this->report->count($entity, 'unchanged');
@@ -474,7 +484,8 @@ final class SeedImporter implements SeedLookup
     }
 
     /**
-     * Featured image, SEO and inline FAQs (shared by pages, posts and equipos).
+     * Featured image, SEO and inline FAQs (shared by pages, posts and equipos). Price, schema type, TOC and the
+     * rating override are written only when the seed item declares them: otherwise WordPress keeps its values.
      *
      * @param  array<array-key, mixed>  $item
      */
@@ -485,8 +496,27 @@ final class SeedImporter implements SeedLookup
         $imageId !== null ? set_post_thumbnail($id, $imageId) : delete_post_thumbnail($id);
 
         $root = new FieldBuilder;
-        update_field($root->key('seo'), $this->mapper->seo(Arr::array($item, 'seo')), $id);
+        $seo = $this->mapper->seo(Arr::array($item, 'seo'));
+        update_field($root->key('seo'), $seo, $id);
+        $this->rankMath->write($id, $seo);
         update_field($root->key('faqs'), $this->mapper->faqs($item), $id);
+
+        $price = $this->mapper->price($item);
+        if ($price !== null) {
+            update_field($root->key('price'), $price, $id);
+        }
+        $schemaType = $this->mapper->schemaType($item);
+        if ($schemaType !== null) {
+            update_field($root->key('schema_type'), $schemaType, $id);
+        }
+        $toc = $this->mapper->toc($item);
+        if ($toc !== null) {
+            update_field($root->key('toc'), $toc, $id);
+        }
+        $ratings = $this->mapper->ratings($item);
+        if ($ratings !== null) {
+            update_field($root->key('ratings'), $ratings, $id);
+        }
     }
 
     /**
@@ -553,7 +583,7 @@ final class SeedImporter implements SeedLookup
     {
         $slug = Arr::string($item, 'slug');
         $name = Arr::string($item, 'name');
-        $hash = md5(serialize($item));
+        $hash = $this->assets->hash($item);
         $existing = get_term_by('slug', $slug, $taxonomy);
 
         if ($existing instanceof \WP_Term && ! $this->force && get_term_meta($existing->term_id, self::SEED_HASH, true) === $hash) {

@@ -5,8 +5,8 @@ declare(strict_types=1);
 namespace BanosPortatiles\Headless\Cache;
 
 /**
- * Transient cache for API payloads. Keys are namespaced by a version number that is bumped on every
- * content change, so invalidation is O(1) and also works with a persistent object cache.
+ * Transient cache for API payloads. Keys are namespaced by the plugin version and by a version number that is
+ * bumped on every content change, so invalidation is O(1) and also works with a persistent object cache.
  */
 final class ResponseCache
 {
@@ -28,7 +28,7 @@ final class ResponseCache
             return $producer();
         }
 
-        $transient = self::PREFIX.md5($this->version().'|'.$key);
+        $transient = self::PREFIX.md5(self::codeVersion().'|'.$this->version().'|'.$key);
         $cached = get_transient($transient);
         if ($cached !== false) {
             /** @var T $cached */
@@ -39,6 +39,12 @@ final class ResponseCache
         set_transient($transient, $value, $ttl);
 
         return $value;
+    }
+
+    /** A new plugin version invalidates every cached payload (their shape may have changed). */
+    public static function codeVersion(): string
+    {
+        return defined('BanosPortatiles\\Headless\\VERSION') ? (string) constant('BanosPortatiles\\Headless\\VERSION') : 'dev';
     }
 
     public function version(): string

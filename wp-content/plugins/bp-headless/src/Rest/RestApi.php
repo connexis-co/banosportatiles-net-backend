@@ -9,12 +9,15 @@ use BanosPortatiles\Headless\Rest\Controllers\ContentController;
 use BanosPortatiles\Headless\Rest\Controllers\FaqsController;
 use BanosPortatiles\Headless\Rest\Controllers\LeadsController;
 use BanosPortatiles\Headless\Rest\Controllers\NodeController;
+use BanosPortatiles\Headless\Rest\Controllers\RatingsController;
 use BanosPortatiles\Headless\Rest\Controllers\RedirectsController;
+use BanosPortatiles\Headless\Rest\Controllers\ReviewsController;
 use BanosPortatiles\Headless\Rest\Controllers\RoutesController;
 use BanosPortatiles\Headless\Rest\Controllers\SiteController;
 
 /**
- * Registers the bp/v1 namespace (contract: docs/plans/2026-09-22_reestructuracion-headless.md §5).
+ * Registers the bp/v1 namespace (contracts: docs/plans/2026-09-22_reestructuracion-headless.md §5 and
+ * docs/plans/2026-09-24_valoraciones-toc-rankmath-precios.md §3).
  */
 final class RestApi implements Hookable
 {
@@ -28,6 +31,8 @@ final class RestApi implements Hookable
         private readonly FaqsController $faqs,
         private readonly RedirectsController $redirects,
         private readonly LeadsController $leads,
+        private readonly RatingsController $ratings,
+        private readonly ReviewsController $reviews,
     ) {}
 
     public function register(): void
@@ -89,6 +94,38 @@ final class RestApi implements Hookable
             'methods' => \WP_REST_Server::CREATABLE,
             'callback' => [$this->leads, 'handle'],
             'permission_callback' => [$this->leads, 'authorize'],
+        ]);
+
+        register_rest_route(self::NAMESPACE, '/ratings', [
+            [
+                'methods' => \WP_REST_Server::READABLE,
+                'callback' => [$this->ratings, 'index'],
+                'permission_callback' => $public,
+                'args' => ['uri' => ['type' => 'string']],
+            ],
+            [
+                'methods' => \WP_REST_Server::CREATABLE,
+                'callback' => [$this->ratings, 'vote'],
+                'permission_callback' => [$this->ratings, 'authorize'],
+            ],
+        ]);
+
+        register_rest_route(self::NAMESPACE, '/reviews', [
+            [
+                'methods' => \WP_REST_Server::READABLE,
+                'callback' => [$this->reviews, 'index'],
+                'permission_callback' => $public,
+                'args' => [
+                    'uri' => ['type' => 'string', 'required' => true],
+                    'page' => ['type' => 'integer', 'minimum' => 1, 'default' => 1],
+                    'per_page' => ['type' => 'integer', 'minimum' => 1, 'maximum' => ReviewsController::MAX_PER_PAGE, 'default' => ReviewsController::DEFAULT_PER_PAGE],
+                ],
+            ],
+            [
+                'methods' => \WP_REST_Server::CREATABLE,
+                'callback' => [$this->reviews, 'create'],
+                'permission_callback' => [$this->reviews, 'authorize'],
+            ],
         ]);
     }
 }

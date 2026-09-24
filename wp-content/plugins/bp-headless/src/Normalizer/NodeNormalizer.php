@@ -4,11 +4,13 @@ declare(strict_types=1);
 
 namespace BanosPortatiles\Headless\Normalizer;
 
+use BanosPortatiles\Headless\Config;
 use BanosPortatiles\Headless\Content\PageTemplates;
 use BanosPortatiles\Headless\Content\PostTypes;
 use BanosPortatiles\Headless\Content\Taxonomies;
 use BanosPortatiles\Headless\Fields\FieldReader;
 use BanosPortatiles\Headless\Html\ContentRenderer;
+use BanosPortatiles\Headless\Reviews\RatingService;
 use BanosPortatiles\Headless\Routing\UriResolver;
 use BanosPortatiles\Headless\Support\Arr;
 
@@ -24,6 +26,10 @@ final class NodeNormalizer
     /** @var array<string, array{name: string, uri: string}> */
     private array $listingCrumbs = [];
 
+    private mixed $tocSettings = null;
+
+    private bool $tocLoaded = false;
+
     public function __construct(
         private readonly FieldReader $fields,
         private readonly ReferenceResolver $refs,
@@ -34,6 +40,7 @@ final class NodeNormalizer
         private readonly SectionsNormalizer $sections,
         private readonly FaqNormalizer $faqs,
         private readonly CiudadNormalizer $ciudades,
+        private readonly RatingService $ratings,
     ) {}
 
     /**
@@ -58,7 +65,7 @@ final class NodeNormalizer
             'excerpt' => $excerpt,
             'order' => $post->menu_order,
             'contentHtml' => $contentHtml,
-            'seo' => $this->seo->normalize($this->fields->get('seo', $id), $title, $excerpt),
+            'seo' => $this->seo->normalize($post, $title, $excerpt, $uri),
         ];
 
         if ($type === 'page') {
@@ -94,11 +101,32 @@ final class NodeNormalizer
         if ($type === PostTypes::EQUIPO) {
             $node['equipo'] = $this->equipo($id);
         }
+        // Price and schema type only on service, city and equipo nodes (stale values of other templates are ignored).
+        $supportsPrice = PriceNormalizer::supports($node['template']);
+        $price = $supportsPrice ? PriceNormalizer::normalize($this->fields->get('price', $id)) : null;
+        if ($price !== null) {
+            $node['price'] = $price;
+        }
+        $node['schemaType'] = $supportsPrice ? PriceNormalizer::schemaType($this->fields->get('schema_type', $id)) : 'auto';
+        // "rating" and "reviews" only when this node has ratings (Site Reviews active + policy).
+        $node += $this->ratings->forNode($post);
+        $node['toc'] = TocResolver::resolve($this->tocSettings(), $this->fields->get('toc', $id), $node['template']);
         if ($preview) {
             $node['preview'] = true;
         }
 
         return $node;
+    }
+
+    /** «Ajustes del sitio → Tabla de contenidos», read once per request. */
+    private function tocSettings(): mixed
+    {
+        if (! $this->tocLoaded) {
+            $this->tocSettings = $this->fields->get('toc', Config::OPTIONS_ID);
+            $this->tocLoaded = true;
+        }
+
+        return $this->tocSettings;
     }
 
     public static function excerpt(string $excerpt, string $contentHtml): string

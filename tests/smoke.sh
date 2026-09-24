@@ -1,5 +1,7 @@
 #!/usr/bin/env bash
 # Smoke tests against the LOCAL Docker stack (run bin/setup.sh first). Requires curl, jq and openssl.
+# Expects the seed-sample content (the default BP_SEED_DIR): with the frontend seed imported, sections 1–10
+# fail on purpose (exact routes and counts). bin/reset.sh --yes restores it.
 # Usage: tests/smoke.sh
 set -uo pipefail
 
@@ -42,7 +44,9 @@ post_lead() { # post_lead <name> <expected> <body> [timestamp] [signature-overri
     -H "X-BP-Timestamp: $ts" -H "X-BP-Signature: $sig" -H "X-BP-Client-IP: $SMOKE_IP" --data-binary "$3"
 }
 
+SMOKE_VOTERS=""
 cleanup() {
+  for voter in $SMOKE_VOTERS; do wp bp reviews purge --voter="$voter" --yes >/dev/null; done
   wp config delete BP_LEADS_EMAIL --type=constant >/dev/null
   wp config delete BP_SMTP_PASS --type=constant >/dev/null
   wp option delete bp_site_deploy_hook_url >/dev/null
@@ -242,7 +246,7 @@ expect_no_header "sin Access-Control-Allow-Origin para orígenes ajenos" 'Access
 
 section "9b. Aviso «sitio en venta» (plugin bp-sitio-en-venta)"
 http "GET /bp-venta/v1/config" 200 "$VENTA/config"
-expect_json "forma del objeto (16 claves + version) y tipos" '(keys | length == 17) and (.enabled | type == "boolean") and (.modo | IN("venta","alquiler","venta_o_alquiler")) and (.colors | keys) == ["accent","accent_text","bg","text"] and (.placements | type == "array") and (.dismiss_days | type == "number") and (.version | test("^[0-9a-f]{12}$"))'
+expect_json "forma del objeto (16 claves + version) y tipos" '(keys | length == 17) and (.enabled | type == "boolean") and (.modo | IN("venta","alquiler","venta_o_alquiler")) and (.colors | keys) == ["accent","accent_text","bg","text"] and (.placements | type == "object") and (.dismiss_days | type == "number") and (.version | test("^[0-9a-f]{12}$"))'
 expect_header "Cache-Control público" 'Cache-Control: public, max-age=60'
 venta_etag="$(grep -i '^ETag:' "$TMP/headers" | cut -d' ' -f2 | tr -d '\r')"
 http "config con If-None-Match → 304" 304 -H "If-None-Match: $venta_etag" "$VENTA/config"
@@ -262,7 +266,7 @@ $_POST = $_REQUEST = ["_wpnonce" => wp_create_nonce("bp_sitio_en_venta_save"), "
   "placements" => ["top_bar"], "dismissible" => "1", "dismiss_days" => "5", "exclude_paths" => "/cotizar/"]];
 (new BanosPortatiles\SitioEnVenta\Admin\SettingsPage(BanosPortatiles\SitioEnVenta\Plugin::store()))->save();' >/dev/null
 http "config tras «Guardar y publicar» desde el admin" 200 "$VENTA/config"
-expect_json "cambios visibles al instante (caché invalidada) y E.164 normalizado" '.headline == "Titular de prueba smoke" and .whatsapp_number == "+573000000000" and .show_whatsapp == true and .dismiss_days == 5 and .placements == ["top_bar"] and (.message | startswith("Dominio"))'
+expect_json "cambios visibles al instante (caché invalidada) y E.164 normalizado" '.headline == "Titular de prueba smoke" and .whatsapp_number == "+573000000000" and .show_whatsapp == true and .dismiss_days == 5 and .placements.top_bar == true and ([.placements[]] | map(select(.)) | length == 1) and (.message | startswith("Dominio"))'
 [[ "$(jq -r .version "$TMP/body")" != "$(jq -r .version "$TMP/venta.json")" ]] && ok "version cambia (el front reinicia los avisos cerrados)" || ko "version sin cambios"
 [[ "$(curl -s "$API/site" | jq -r '.sale_banner.headline')" == "Titular de prueba smoke" ]] && ok "/site → sale_banner actualizado (caché de bp-headless invalidada)" || ko "/site → sale_banner desactualizado"
 [[ "$(wp transient get bp_sitio_en_venta_notice_1 --format=json | jq -r '.published')" == "scheduled" ]] && ok "«Guardar y publicar» programó el deploy vía bp-headless" || ko "publicación no programada"
@@ -279,6 +283,103 @@ wp cron event run bp_headless_deploy >/dev/null
 if docker compose exec -T hook-sink cat /sink/requests.log 2>/dev/null | grep '"path":"/deploy"' | grep -q 'bp-headless'; then ok "POST al deploy hook recibido"; else ko "POST al deploy hook"; fi
 last_ok="$(wp option get bp_headless_deploy_last --format=json | jq -r '.ok')"
 [[ "$last_ok" == "true" ]] && ok "último disparo registrado como OK (widget del dashboard)" || ko "registro del último disparo"
+
+section "11. Valoraciones, reseñas, precios, TOC y SEO (Site Reviews + Rank Math)"
+for plugin in site-reviews seo-by-rank-math safe-svg; do
+  wp plugin is-active "$plugin" >/dev/null && ok "plugin $plugin activo" || ko "plugin $plugin activo"
+done
+[[ "$(wp bp setup reviews | grep -c actualizado)" == "0" ]] && ok "wp bp setup reviews es idempotente" || ko "wp bp setup reviews idempotente"
+[[ "$(wp bp setup rankmath | grep -c actualizado)" == "0" ]] && ok "wp bp setup rankmath es idempotente" || ko "wp bp setup rankmath idempotente"
+wp bp cache flush >/dev/null
+no_nulls() { # no_nulls <name> <url>: contract §3 — optional keys are omitted, never null
+  local nulls
+  nulls="$(curl -s "$2" | jq '[.. | select(. == null)] | length')"
+  [[ "$nulls" == "0" ]] && ok "$1 sin null" || ko "$1 sin null" "$nulls valores null"
+}
+for type in page post equipo; do no_nulls "/content?type=$type" "$API/content?type=$type&per_page=100"; done
+no_nulls "/site" "$API/site"
+http "GET /site (ratings, toc, microcopy, seo, header, secondary)" 200 "$API/site"
+expect_json "site.ratings con tipos, textos y umbral" '(.ratings.enabled | type == "boolean") and (.ratings.types | keys) == ["blog","ciudades","equipos","otras","servicios"] and (.ratings.texts.starsTitle | type == "string") and (.ratings.minCountForSchema >= 1)'
+expect_json "site.toc, microcopy (objeto), seo y header" '(.toc.enabled_types | type == "array") and (.toc.depth | IN(2,3)) and (.microcopy | type == "object") and (.seo.siteName | length > 0) and (.seo.separator | length > 0) and (.header.cta_href | startswith("/"))'
+expect_json "menus.secondary y kind en el menú principal" '(.menus.secondary | type == "array") and all(.menus.header[]; .kind | IN("links","ciudades","servicios","blog"))'
+
+routes="$(curl -s "$API/routes")"
+post_uri="$(jq -r 'map(select(.template == "post"))[0].uri // empty' <<<"$routes")"
+service_uri="$(jq -r 'map(select(.template == "hub-servicio" or .template == "servicio"))[0].uri // empty' <<<"$routes")"
+[[ -n "$post_uri" && -n "$service_uri" ]] && ok "rutas de prueba: $service_uri y $post_uri" || ko "rutas de prueba (post y servicio)"
+
+http "GET /node post" 200 "$API/node?uri=$post_uri"
+expect_json "node: seo.source, schemaType, toc resuelto, rating y reviews" '(.seo.source | IN("rankmath","bp")) and .schemaType == "auto" and (.toc | has("enabled") and has("labels") and has("exclude")) and (.rating.count | type == "number") and (.rating.distribution | keys) == ["1","2","3","4","5"] and (.reviews | type == "array")'
+[[ "$(wp plugin is-active seo-by-rank-math && echo on)" == "on" ]] && expect_json "seo desde Rank Math" '.seo.source == "rankmath"'
+http "GET /node home" 200 "$API/node?uri=/"
+expect_json "la home no tiene valoraciones (self-serving)" '(has("rating") | not) and (has("reviews") | not) and (has("price") | not)'
+
+http "GET /ratings" 200 "$API/ratings"
+expect_json "lista {uri, id, count, average…}" 'type == "array" and all(.[]; has("uri") and has("id") and has("count") and has("average") and .best == 5 and .worst == 1)'
+expect_header "GET /ratings con ETag" 'ETag:'
+ratings_etag="$(grep -i '^ETag:' "$TMP/headers" | cut -d' ' -f2 | tr -d '\r')"
+http "GET /ratings con If-None-Match → 304" 304 -H "If-None-Match: $ratings_etag" "$API/ratings"
+http "GET /ratings?uri=/ (home) → 403" 403 "$API/ratings?uri=/"
+expect_json "code ratings_disabled" '.code == "ratings_disabled"'
+http "GET /ratings?uri=/no-existe/ → 404" 404 "$API/ratings?uri=/no-existe/"
+http "GET /reviews?uri=post" 200 "$API/reviews?uri=$post_uri&per_page=5"
+expect_header "X-WP-Total en /reviews" 'X-WP-Total:'
+http "GET /reviews?uri=servicio → 403 (sin opiniones)" 403 "$API/reviews?uri=$service_uri"
+http "GET /reviews per_page=51 → 400" 400 "$API/reviews?uri=$post_uri&per_page=51"
+
+post_signed() { # post_signed <name> <expected> <route> <body>
+  local ts sig
+  ts="$(date +%s)"
+  sig="sha256=$(sign "$ts" "$4")"
+  http "$1" "$2" -X POST "$API$3" -H 'Content-Type: application/json' -H "X-BP-Timestamp: $ts" -H "X-BP-Signature: $sig" --data-binary "$4"
+}
+VOTER_A="$(openssl rand -hex 32)"; VOTER_B="$(openssl rand -hex 32)"; VOTER_C="$(openssl rand -hex 32)"
+SMOKE_VOTERS="$VOTER_A $VOTER_B $VOTER_C"
+VOTE="{\"uri\":\"$service_uri\",\"rating\":5,\"voter\":\"$VOTER_A\",\"ip\":\"$SMOKE_IP\",\"ua\":\"smoke\",\"country\":\"CO\"}"
+http "POST /ratings sin firma → 401" 401 -X POST "$API/ratings" -H 'Content-Type: application/json' --data-binary "$VOTE"
+post_signed "POST /ratings inválido → 422" 422 /ratings "{\"uri\":\"$service_uri\",\"rating\":7,\"voter\":\"x\",\"ip\":\"x\"}"
+expect_json "errors por campo" '.errors | has("rating") and has("voter") and has("ip")'
+post_signed "POST /ratings en la home → 403" 403 /ratings "{\"uri\":\"/\",\"rating\":5,\"voter\":\"$VOTER_A\",\"ip\":\"$SMOKE_IP\"}"
+wp cron event delete bp_headless_deploy >/dev/null
+post_signed "POST /ratings voto → 201" 201 /ratings "$VOTE"
+expect_json "created y resumen con el voto" '.ok == true and .created == true and .summary.count >= 1 and .summary.uri == "'"$service_uri"'"'
+post_signed "POST /ratings mismo votante → 200 duplicado" 200 /ratings "${VOTE/\"rating\":5/\"rating\":3}"
+expect_json "duplicate sin segundo voto" '.created == false and .duplicate == true'
+[[ "$(wp post list --post_type=site-review --post_status=any --meta_key=_bp_voter --meta_value="$VOTER_A" --format=count)" == "1" ]] && ok "el voto aparece en Site Reviews (1 reseña)" || ko "voto en Site Reviews"
+vote_id="$(wp post list --post_type=site-review --post_status=any --meta_key=_bp_voter --meta_value="$VOTER_A" --field=ID | head -1)"
+[[ "$(wp post term list "$vote_id" site-review-category --field=slug)" == "calificacion" && "$(wp post get "$vote_id" --field=post_status)" == "publish" ]] && ok "voto aprobado con la categoría «Calificación»" || ko "categoría/estado del voto"
+[[ "$(wp cron event list --hook=bp_headless_deploy --format=count)" == "1" ]] && ok "el voto aprobado pide un deploy (ventana de 15 min)" || ko "deploy tras el voto"
+curl -s "$API/ratings?uri=$service_uri" > "$TMP/body"
+expect_json "GET /ratings?uri= refleja el voto (caché invalidada)" '.count >= 1 and .distribution["5"] >= 1'
+
+REVIEW="{\"uri\":\"$post_uri\",\"rating\":4,\"title\":\"Prueba smoke\",\"content\":\"Opinión automática de prueba: se borra al final.\",\"name\":\"Prueba Smoke\",\"email\":\"smoke@example.com\",\"consent\":true,\"voter\":\"$VOTER_B\",\"ip\":\"$SMOKE_IP\"}"
+post_signed "POST /reviews inválida → 422" 422 /reviews "{\"uri\":\"$post_uri\",\"rating\":4,\"content\":\"corta\",\"name\":\"A\",\"email\":\"x\",\"consent\":\"sí\",\"voter\":\"$VOTER_B\",\"ip\":\"$SMOKE_IP\"}"
+expect_json "errors: content, name, email y consent" '.errors | has("content") and has("name") and has("email") and has("consent")'
+post_signed "POST /reviews → 201 pendiente" 201 /reviews "$REVIEW"
+expect_json "status pending" '.ok == true and .status == "pending" and (.id | type == "number")'
+post_signed "POST /reviews mismo votante → 409" 409 /reviews "${REVIEW/Prueba smoke/Segunda prueba}"
+expect_json "code duplicate" '.code == "duplicate"'
+review_id="$(wp post list --post_type=site-review --post_status=any --meta_key=_bp_voter --meta_value="$VOTER_B" --field=ID | head -1)"
+[[ "$(wp post get "$review_id" --field=post_status)" == "pending" && "$(wp post term list "$review_id" site-review-category --field=slug)" == "comentario" ]] && ok "opinión pendiente con la categoría «Comentario»" || ko "estado/categoría de la opinión"
+if curl -s "$API/reviews?uri=$post_uri" | grep -q 'smoke@example.com'; then ko "el email no sale en la API"; else ok "el email no sale en la API"; fi
+post_signed "POST /ratings voto en el post" 201 /ratings "{\"uri\":\"$post_uri\",\"rating\":2,\"voter\":\"$VOTER_C\",\"ip\":\"$SMOKE_IP\"}"
+voted_id="$(wp post list --post_type=site-review --post_status=any --meta_key=_bp_voter --meta_value="$VOTER_C" --field=ID | head -1)"
+post_signed "POST /reviews del mismo votante → actualiza su voto" 201 /reviews "${REVIEW//$VOTER_B/$VOTER_C}"
+expect_json "updated: true con el id del voto" ".updated == true and .id == ${voted_id:-0} and .status == \"pending\""
+[[ "$(wp post list --post_type=site-review --post_status=any --meta_key=_bp_voter --meta_value="$VOTER_C" --format=count)" == "1" && "$(wp post term list "$voted_id" site-review-category --field=slug)" == "comentario" && "$(wp post get "$voted_id" --field=post_status)" == "pending" ]] && ok "el voto pasó a opinión pendiente («Comentario») sin duplicarse" || ko "voto actualizado a opinión"
+
+section "11b. Site Reviews sin vías públicas de escritura"
+curl -s "$BASE/wp-json/site-reviews/v1" > "$TMP/body"
+expect_json "la ruta /site-reviews/v1/submissions no está registrada" '(.routes | has("/site-reviews/v1/submissions")) | not'
+http "POST /site-reviews/v1/submissions → 403" 403 -X POST "$BASE/wp-json/site-reviews/v1/submissions" -H 'Content-Type: application/json' -d '{"site-reviews":{"rating":5}}'
+http "REST POST /site-reviews/v1/reviews sin editor → 403" 403 -X POST "$BASE/wp-json/site-reviews/v1/reviews" -H 'Content-Type: application/json' -d '{"rating":5}'
+http "admin-ajax submit-review → 403" 403 -X POST "$BASE/wp-admin/admin-ajax.php" --data-urlencode 'action=glsr_public_action' --data-urlencode 'site-reviews[_action]=submit-review' --data-urlencode 'site-reviews[_ajax_request]=1' --data-urlencode 'site-reviews[rating]=5'
+sleep 6 # Site Reviews' mutex ignores a second form submission from the same IP for 5 s (it would fall through to the 301)
+http "formulario sin JS (POST en init) → 403" 403 -X POST "$BASE/index.php" --data-urlencode 'site-reviews[_action]=submit-review' --data-urlencode 'site-reviews[rating]=5'
+for voter in $SMOKE_VOTERS; do wp bp reviews purge --voter="$voter" --yes >/dev/null; done
+SMOKE_VOTERS=""
+[[ "$(wp post list --post_type=site-review --post_status=any --meta_key=_bp_voter --meta_value="$VOTER_A" --format=count)" == "0" ]] && ok "wp bp reviews purge borra los votos de prueba" || ko "purge de votos de prueba"
+wp cron event delete bp_headless_deploy >/dev/null
 
 printf '\n\033[1mResultado: %d OK, %d fallos\033[0m\n' "$PASS" "$FAIL"
 [[ "$FAIL" -eq 0 ]]

@@ -4,6 +4,8 @@ declare(strict_types=1);
 
 namespace BanosPortatiles\Headless;
 
+use BanosPortatiles\Headless\Deploy\DailySchedule;
+
 /**
  * Runtime configuration. Precedence: PHP constant (wp-config.php) → environment variable → site option.
  */
@@ -17,6 +19,8 @@ final class Config
 
     /** ACF options page storage prefix ("post_id" of the "Ajustes del sitio" page). */
     public const OPTIONS_ID = 'bp_site';
+
+    public const DEFAULT_DAILY_REBUILD_TIME = '04:00';
 
     public function frontendUrl(): string
     {
@@ -68,6 +72,19 @@ final class Config
         }
 
         return $this->option('deploy_hook_url') !== '' ? 'ajustes' : 'none';
+    }
+
+    /**
+     * Daily rebuild time ("HH:MM", site timezone) from «Ajustes del sitio → Despliegue»; null when disabled.
+     * Enabled at 04:00 until the setting is saved otherwise.
+     */
+    public function dailyRebuildTime(): ?string
+    {
+        if ($this->option('deploy_daily_rebuild') === '0') {
+            return null;
+        }
+
+        return DailySchedule::normalize($this->option('deploy_daily_rebuild_time')) ?? self::DEFAULT_DAILY_REBUILD_TIME;
     }
 
     public function leadsWebhookUrl(): string

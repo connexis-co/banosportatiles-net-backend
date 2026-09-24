@@ -6,6 +6,7 @@ namespace BanosPortatiles\Headless\Rest\Controllers;
 
 use BanosPortatiles\Headless\Cache\ResponseCache;
 use BanosPortatiles\Headless\Content\PageTemplates;
+use BanosPortatiles\Headless\Normalizer\SeoNormalizer;
 use BanosPortatiles\Headless\Routing\UriResolver;
 
 /**
@@ -16,6 +17,7 @@ final class RoutesController
     public function __construct(
         private readonly ResponseCache $cache,
         private readonly UriResolver $uris,
+        private readonly SeoNormalizer $seo,
     ) {}
 
     public function handle(\WP_REST_Request $request): \WP_REST_Response
@@ -50,7 +52,7 @@ final class RoutesController
                 'id' => $post->ID,
                 'template' => PageTemplates::slugFor($post),
                 'modified' => $modified !== false ? $modified->format(DATE_ATOM) : '',
-                'noindex' => get_post_meta($post->ID, 'seo_noindex', true) === '1',
+                'noindex' => $this->seo->noindex($post),
             ];
         }
 

@@ -5,7 +5,6 @@ declare(strict_types=1);
 use BanosPortatiles\Headless\Normalizer\FaqNormalizer;
 use BanosPortatiles\Headless\Normalizer\HeroNormalizer;
 use BanosPortatiles\Headless\Normalizer\SectionsNormalizer;
-use BanosPortatiles\Headless\Normalizer\SeoNormalizer;
 use BanosPortatiles\Headless\Tests\Fakes\FakeReferenceResolver;
 
 function refs(): FakeReferenceResolver
@@ -63,16 +62,6 @@ it('normalizes the hero with fallbacks and omits empty optional keys', function 
         ->and($normalizer->normalize(false, 'Título'))->toBeNull();
 });
 
-it('normalizes SEO with title/description fallbacks', function (): void {
-    $normalizer = new SeoNormalizer(refs());
-    $long = str_repeat('palabra ', 40);
-
-    expect($normalizer->normalize(['title' => 'SEO', 'description' => 'Desc', 'canonical' => '', 'noindex' => 1, 'og_image' => 8, 'keyword' => 'kw'], 'T', 'E'))
-        ->toBe(['title' => 'SEO', 'description' => 'Desc', 'noindex' => true, 'ogImage' => refs()->images[8], 'keyword' => 'kw'])
-        ->and($normalizer->normalize(null, 'Título', 'Extracto'))->toBe(['title' => 'Título', 'description' => 'Extracto', 'noindex' => false])
-        ->and(mb_strlen((string) $normalizer->normalize([], 'T', $long)['description']))->toBeLessThanOrEqual(SeoNormalizer::DESCRIPTION_LENGTH);
-});
-
 it('merges inline and bank FAQs without duplicates', function (): void {
     $faqs = (new FaqNormalizer(refs(), fn (string $a): string => mb_strtoupper($a)))->normalize(
         [['q' => '¿Propia?', 'a' => 'sí'], ['q' => '', 'a' => 'sin pregunta'], ['q' => '¿Cuántos baños necesito?', 'a' => 'inline']],
@@ -82,5 +71,27 @@ it('merges inline and bank FAQs without duplicates', function (): void {
     expect($faqs)->toBe([
         ['q' => '¿Propia?', 'a' => 'SÍ'],
         ['q' => '¿Cuántos baños necesito?', 'a' => 'INLINE'],
+    ]);
+});
+
+it('builds the main menu with description, icon, kind and grouped children', function (): void {
+    $menu = \BanosPortatiles\Headless\Normalizer\SiteNormalizer::headerMenu([
+        ['label' => 'Alquiler', 'href' => '/alquiler/', 'description' => 'Para obras y eventos', 'icon' => 'toilet', 'kind' => '', 'children' => [
+            ['label' => 'Eventos', 'href' => '/alquiler/eventos/', 'description' => 'Bodas y conciertos', 'icon' => 'party-popper', 'group' => ''],
+            ['label' => 'Obras', 'href' => '/alquiler/obras/', 'description' => '', 'group' => 'Construcción'],
+            ['label' => '', 'href' => '/sin-texto/'],
+        ]],
+        ['label' => 'Ciudades', 'href' => '', 'kind' => 'ciudades', 'children' => []],
+        ['label' => 'Raro', 'href' => '/x/', 'kind' => 'inventado'],
+        ['label' => '', 'href' => '/sin-texto/'],
+    ]);
+
+    expect($menu)->toBe([
+        ['label' => 'Alquiler', 'href' => '/alquiler/', 'description' => 'Para obras y eventos', 'icon' => 'toilet', 'kind' => 'links', 'children' => [
+            ['label' => 'Eventos', 'href' => '/alquiler/eventos/', 'description' => 'Bodas y conciertos', 'icon' => 'party-popper'],
+            ['label' => 'Obras', 'href' => '/alquiler/obras/', 'group' => 'Construcción'],
+        ]],
+        ['label' => 'Ciudades', 'href' => '', 'kind' => 'ciudades', 'children' => []],
+        ['label' => 'Raro', 'href' => '/x/', 'kind' => 'links', 'children' => []],
     ]);
 });

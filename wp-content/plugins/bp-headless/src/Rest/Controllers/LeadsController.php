@@ -4,31 +4,28 @@ declare(strict_types=1);
 
 namespace BanosPortatiles\Headless\Rest\Controllers;
 
-use BanosPortatiles\Headless\Config;
 use BanosPortatiles\Headless\Leads\ClientIp;
 use BanosPortatiles\Headless\Leads\LeadNotifier;
 use BanosPortatiles\Headless\Leads\LeadRepository;
 use BanosPortatiles\Headless\Leads\LeadValidator;
 use BanosPortatiles\Headless\Leads\LeadWebhook;
 use BanosPortatiles\Headless\Leads\RateLimiter;
-use BanosPortatiles\Headless\Security\HmacSigner;
+use BanosPortatiles\Headless\Security\SignedRequestGuard;
 
 /**
  * POST /bp/v1/leads — server-to-server from the Astro Action (Zod + Turnstile already passed there).
  *
- * 1. authorize(): secret configured (503) → failed-auth throttle per IP (429) → HMAC + ±5 min (401) → replay (401).
+ * 1. authorize(): SignedRequestGuard — secret (503) → failed-auth throttle (429) → HMAC + ±5 min (401) → replay (401).
  * 2. handle(): JSON (400) → validation (422) → per-client throttle (429) → lead + email + webhook (201).
  */
 final class LeadsController
 {
     public const MAX_LEADS_PER_WINDOW = 5;
 
-    public const MAX_FAILED_AUTH_PER_WINDOW = 20;
-
     public const WINDOW = 600;
 
     public function __construct(
-        private readonly Config $config,
+        private readonly SignedRequestGuard $guard,
         private readonly LeadValidator $validator,
         private readonly LeadRepository $repository,
         private readonly LeadNotifier $notifier,
@@ -38,37 +35,7 @@ final class LeadsController
 
     public function authorize(\WP_REST_Request $request): true|\WP_Error
     {
-        $secret = $this->config->leadsSecret();
-        if ($secret === '') {
-            return new \WP_Error('bp_leads_disabled', 'El endpoint de leads no está configurado (BP_LEADS_SECRET).', ['status' => 503]);
-        }
-
-        $ip = ClientIp::network();
-        if ($this->limiter->tooMany('leads_auth_fail', $ip, self::MAX_FAILED_AUTH_PER_WINDOW)) {
-            return new \WP_Error('bp_rate_limited', 'Demasiados intentos fallidos. Intenta más tarde.', ['status' => 429]);
-        }
-
-        $signature = (string) $request->get_header('x_bp_signature');
-        $status = (new HmacSigner($secret))->verify(
-            $request->get_body(),
-            $signature,
-            $request->get_header('x_bp_timestamp'),
-            time()
-        );
-
-        if (! $status->isValid()) {
-            $this->limiter->hit('leads_auth_fail', $ip, self::MAX_FAILED_AUTH_PER_WINDOW, self::WINDOW);
-
-            return new \WP_Error('bp_invalid_signature', $status->message(), ['status' => 401]);
-        }
-
-        $nonce = 'bp_lead_sig_'.md5(strtolower($signature));
-        if (get_transient($nonce) !== false) {
-            return new \WP_Error('bp_replayed_request', 'Esta solicitud ya fue procesada.', ['status' => 401]);
-        }
-        set_transient($nonce, 1, 2 * HmacSigner::TOLERANCE);
-
-        return true;
+        return $this->guard->authorize($request, 'bp_leads_disabled', 'El endpoint de leads no está configurado (BP_LEADS_SECRET).');
     }
 
     public function handle(\WP_REST_Request $request): \WP_REST_Response|\WP_Error

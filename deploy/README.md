@@ -43,6 +43,7 @@ cd ~/dev/banosportatiles-net/backend
 deploy/cloudpanel/deploy.sh --dry-run            # imprime todos los comandos (secretos enmascarados); no toca nada
 deploy/cloudpanel/deploy.sh                      # deploy real (idempotente: se puede repetir)
 deploy/cloudpanel/deploy.sh --seed=<carpeta>     # además importa <carpeta>/bundle.json (+ assets/) del frontend
+deploy/cloudpanel/deploy.sh --seed=<carpeta> --seed-force   # reescribe también los ítems sin cambios (tras cambios del importador)
 deploy/cloudpanel/deploy.sh --skip-cert          # si el DNS aún no apunta al servidor
 ```
 
@@ -59,9 +60,9 @@ Qué hace:
 | 5 | `wp core download --locale=es_CO` | solo si falta `wp-load.php` |
 | 6 | `wp-config.php` **regenerado** (0640) con BD, `WP_HOME`, `FORCE_SSL_ADMIN`, `DISALLOW_FILE_EDIT`, `DISABLE_WP_CRON`, `BP_*` y `BP_SMTP_*`; salts en `wp-salts.php` (se generan una vez) | siempre (declarativo) |
 | 7 | `wp core install` + contraseña del admin fijada desde un archivo temporal 0600 (nunca en argv); borra el post, la página y la política de ejemplo | solo en la primera instalación |
-| 8 | rsync de `bp-headless`, `bp-sitio-en-venta` y del tema; `wp plugin install secure-custom-fields redirection wp-nested-pages two-factor` (3 reintentos) y activación; `wp redirection database install` | instala solo lo que falta |
+| 8 | rsync de `bp-headless`, `bp-sitio-en-venta` y del tema; `wp plugin install secure-custom-fields redirection wp-nested-pages two-factor site-reviews seo-by-rank-math safe-svg` (3 reintentos) y activación (Site Reviews, Rank Math y Safe SVG **después** de bp-headless, para que sus instaladores vean el CPT `equipo`); `wp redirection database install`; `wp bp setup reviews` y `wp bp setup rankmath` | instala solo lo que falta; los setups son idempotentes |
 | 9 | es_CO, `America/Bogota`, `blog_public=0`, comentarios cerrados, permalinks `/%postname%/` | siempre |
-| 10 | `wp bp import-seed` si se pasó `--seed` | upsert idempotente |
+| 10 | `wp bp import-seed` si se pasó `--seed` (con `--force` si además se pasó `--seed-force`) | upsert idempotente; sin `--seed-force` salta los ítems cuyo hash no cambió |
 | 11 | Cron real en el crontab del usuario del sitio (`wp cron event run --due-now` cada minuto) | reemplaza su propia línea |
 | 12 | `clpctl lets-encrypt:install:certificate --domainName=admin.banosportatiles.net` | solo si no hay un certificado LE con más de 30 días |
 
@@ -104,7 +105,7 @@ ssh connexis-prod "runuser -u banosportatiles-cms -- php8.4 /usr/local/bin/wp --
 
 ## 6. Probar el deploy sin servidor
 
-[`cloudpanel/sim/run.sh`](cloudpanel/sim/run.sh) ejecuta el `deploy.sh` real contra un CloudPanel simulado en Docker: Debian con PHP 8.4, un `clpctl` falso, la MariaDB local en `127.0.0.1` y un `ssh` falso con `docker exec`. Hace una pasada nueva y otra idempotente y verifica 14 puntos: vhost, permisos, constantes, contraseña del admin, plugins, ajustes, contenido de ejemplo, API, aviso de venta, cron y certificado. Requiere el Docker local levantado (`bin/setup.sh`). Úsalo antes de cada deploy real si cambió algo en `deploy/cloudpanel/`.
+[`cloudpanel/sim/run.sh`](cloudpanel/sim/run.sh) ejecuta el `deploy.sh` real contra un CloudPanel simulado en Docker: Debian con PHP 8.4, un `clpctl` falso, la MariaDB local en `127.0.0.1` y un `ssh` falso con `docker exec`. Hace una pasada nueva, otra idempotente y una tercera con `--seed-force`, y verifica 17 puntos: vhost, permisos, constantes, contraseña del admin, plugins (incluidos Site Reviews, Rank Math y Safe SVG), setups, ajustes, contenido de ejemplo, API, aviso de venta, nombre del sitio en Rank Math, cron y certificado. Requiere el Docker local levantado (`bin/setup.sh`). Úsalo antes de cada deploy real si cambió algo en `deploy/cloudpanel/`.
 
 ## 7. Backups
 
@@ -126,3 +127,43 @@ El sitio público no depende del CMS en caliente, porque Astro se construye con 
 - **Código:** vuelve a desplegar el commit anterior (`git checkout <sha> -- wp-content deploy && deploy/cloudpanel/deploy.sh`).
 - **Datos:** restaura el último backup de CloudPanel.
 - **Borrado total** del CMS (irreversible): `clpctl site:delete --domainName=admin.banosportatiles.net --force`.
+
+## 10. Actualización a la 1.1.0 (valoraciones, precios, TOC, Rank Math, menús e imágenes)
+
+Una sola vez, en este orden (plan `docs/plans/2026-09-24_valoraciones-toc-rankmath-precios.md` §9). `WP` abrevia el
+WP-CLI del sitio en el servidor:
+
+```bash
+WP='runuser -u banosportatiles-cms -- php8.4 -d memory_limit=512M /usr/local/bin/wp --path=/home/banosportatiles-cms/htdocs/admin.banosportatiles.net'
+
+# 1. Bundle del seed del frontend (el mismo que usa el build)
+(cd ../frontend && pnpm seed:bundle --out ../backend/dist/seed-front)
+
+# 2. Código + plugins (Site Reviews, Rank Math, Safe SVG) + setups + seed reescrito completo
+deploy/cloudpanel/deploy.sh --dry-run --seed=dist/seed-front --seed-force   # revisar
+deploy/cloudpanel/deploy.sh --seed=dist/seed-front --seed-force
+
+# 3. SEO de SCF → Rank Math (lo que el seed no cubra; nunca pisa lo que ya tenga Rank Math)
+ssh connexis-prod "$WP bp seo migrate-rankmath --dry-run"
+ssh connexis-prod "$WP bp seo migrate-rankmath"
+
+# 4. Comprobación
+ssh connexis-prod "$WP plugin list --status=active --field=name"
+ssh connexis-prod "$WP bp reviews stats"      # todo en 0: sin votos de ejemplo
+API=https://admin.banosportatiles.net/wp-json/bp/v1
+curl -s $API/site | jq '{seo, ratings: .ratings.enabled, toc: .toc.enabled_types}'
+curl -s "$API/ratings" | jq 'length'
+curl -s -o /dev/null -w '%{http_code}\n' -X POST $API/ratings              # 401 (sin firma)
+```
+
+Después, en el admin:
+- **Site Reviews → Ajustes → Notificaciones:** el email que recibe los avisos de opiniones nuevas (por defecto, el del admin de WordPress).
+- **Ajustes del sitio → Despliegue:** el deploy hook y el rebuild diario (activo por defecto a las 04:00).
+- **Ajustes del sitio → Valoraciones:** qué tipos de página tienen estrellas u opiniones.
+
+`--seed-force` reescribe con el seed todo el contenido importado, incluidas las ediciones hechas en el CMS después del
+último import. Si alguien editó páginas en el CMS, hay que pasar esos cambios al seed antes, o desplegar sin `--seed-force`.
+Así, solo se reimportan los YAML que cambiaron.
+
+Rollback de la 1.1.0: `ssh connexis-prod "$WP plugin deactivate site-reviews seo-by-rank-math safe-svg"`.
+bp-headless sigue funcionando: el SEO sale de SCF y el Node no trae `rating`. Si hace falta, vuelve a desplegar el commit anterior (§9).

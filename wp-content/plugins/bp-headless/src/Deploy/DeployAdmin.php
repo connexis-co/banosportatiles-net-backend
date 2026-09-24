@@ -98,8 +98,13 @@ final class DeployAdmin implements Hookable
         echo '<p>Sitio público: <a href="'.esc_url($front).'" target="_blank" rel="noopener">'.esc_html($front).'</a></p>';
         echo '<p>Deploy hook: <strong>'.esc_html($source).'</strong></p>';
         if ($next !== null) {
-            echo '<p>⏳ Publicación en cola para las '.esc_html(wp_date('H:i:s', $next) ?: '').' (agrupa los cambios de ~1 minuto).</p>';
+            echo '<p>⏳ Publicación en cola para las '.esc_html(wp_date('H:i:s', $next) ?: '').' (agrupa los cambios: ~1 minuto para el contenido, hasta 15 minutos para las reseñas).</p>';
         }
+        $daily = $this->config->dailyRebuildTime();
+        $dailyNext = wp_next_scheduled(DailyRebuild::HOOK);
+        echo '<p>Rebuild diario: '.($daily === null
+            ? 'desactivado'
+            : '<strong>'.esc_html($daily).'</strong>'.(is_int($dailyNext) ? ' (próximo: '.esc_html(wp_date($format, $dailyNext) ?: '').')' : '')).'</p>';
         if ($last !== null) {
             printf(
                 '<p>Último disparo: %s — %s (%s)<br><small>%s · %s</small></p>',
