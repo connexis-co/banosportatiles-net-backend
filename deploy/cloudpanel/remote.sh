@@ -33,6 +33,9 @@ main() {
   VHOST_FILE="/etc/nginx/sites-enabled/$CMS_DOMAIN.conf"
   PRIVATE_DIR="$SITE_HOME/.bp-deploy"
   PLUGINS=(secure-custom-fields redirection wp-nested-pages two-factor)
+  # Integrations of bp-headless (ratings/reviews, SEO meta, SVG logo). Activated after bp-headless so their
+  # installers see the "equipo" post type; bp-headless works without them (plan 2026-09-24 §9).
+  INTEGRATIONS=(site-reviews seo-by-rank-math safe-svg)
 
   # ---------------------------------------------------------------------------------------------
   log "1/12 Plantilla de vhost «$VHOST_TEMPLATE»"
@@ -210,7 +213,7 @@ PHP
   sync_dir "$STAGE_DIR/bp-headless-theme" "$DOCROOT/wp-content/themes/bp-headless-theme"
   sync_dir "$STAGE_DIR/bp-headless" "$DOCROOT/wp-content/plugins/bp-headless"
   sync_dir "$STAGE_DIR/bp-sitio-en-venta" "$DOCROOT/wp-content/plugins/bp-sitio-en-venta"
-  for plugin in "${PLUGINS[@]}"; do
+  for plugin in "${PLUGINS[@]}" "${INTEGRATIONS[@]}"; do
     wp plugin is-installed "$plugin" || retry 3 wp plugin install "$plugin" --quiet
   done
   wp plugin activate "${PLUGINS[@]}" --quiet
@@ -220,8 +223,10 @@ PHP
   wp theme activate bp-headless-theme --quiet
   for theme in $(wp theme list --status=inactive --field=name); do wp theme delete "$theme" --quiet; done
   wp plugin activate bp-headless bp-sitio-en-venta --quiet
+  wp plugin activate "${INTEGRATIONS[@]}" --quiet
   wp redirection database install >/dev/null 2>&1 || true
   ok "bp-headless $(wp plugin get bp-headless --field=version) y bp-sitio-en-venta $(wp plugin get bp-sitio-en-venta --field=version) activos"
+  ok "Site Reviews $(wp plugin get site-reviews --field=version), Rank Math $(wp plugin get seo-by-rank-math --field=version) y Safe SVG $(wp plugin get safe-svg --field=version) activos"
 
   # ---------------------------------------------------------------------------------------------
   log "9/12 Ajustes: idioma, zona horaria, permalinks, noindex, comentarios"

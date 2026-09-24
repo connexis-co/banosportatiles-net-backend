@@ -59,7 +59,7 @@ Qué hace:
 | 5 | `wp core download --locale=es_CO` | solo si falta `wp-load.php` |
 | 6 | `wp-config.php` **regenerado** (0640) con BD, `WP_HOME`, `FORCE_SSL_ADMIN`, `DISALLOW_FILE_EDIT`, `DISABLE_WP_CRON`, `BP_*` y `BP_SMTP_*`; salts en `wp-salts.php` (se generan una vez) | siempre (declarativo) |
 | 7 | `wp core install` + contraseña del admin fijada desde un archivo temporal 0600 (nunca en argv); borra el post, la página y la política de ejemplo | solo en la primera instalación |
-| 8 | rsync de `bp-headless`, `bp-sitio-en-venta` y del tema; `wp plugin install secure-custom-fields redirection wp-nested-pages two-factor` (3 reintentos) y activación; `wp redirection database install` | instala solo lo que falta |
+| 8 | rsync de `bp-headless`, `bp-sitio-en-venta` y del tema; `wp plugin install secure-custom-fields redirection wp-nested-pages two-factor site-reviews seo-by-rank-math safe-svg` (3 reintentos) y activación (Site Reviews, Rank Math y Safe SVG **después** de bp-headless, para que sus instaladores vean el CPT `equipo`); `wp redirection database install` | instala solo lo que falta |
 | 9 | es_CO, `America/Bogota`, `blog_public=0`, comentarios cerrados, permalinks `/%postname%/` | siempre |
 | 10 | `wp bp import-seed` si se pasó `--seed` | upsert idempotente |
 | 11 | Cron real en el crontab del usuario del sitio (`wp cron event run --due-now` cada minuto) | reemplaza su propia línea |

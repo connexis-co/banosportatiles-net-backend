@@ -65,7 +65,7 @@ check "wp-config.php 640 del usuario del sitio" "[[ \$(docker exec bp-sim stat -
 check "constantes BP_* y SMTP en wp-config" "[[ \$(docker exec bp-sim grep -cE \"define\\( '(BP_FRONTEND_URL|BP_LEADS_SECRET|BP_LEADS_EMAIL_TO|BP_SMTP_PASS|BP_SMTP_FROM_NAME)'\" $DOCROOT/wp-config.php) == 5 ]]"
 check "contraseña SMTP con comillas y \$ intacta" "[[ \$(simwp eval 'echo BP_SMTP_PASS;') == \"k'ey\\\\with\\\$chars\" ]]"
 check "contraseña del admin = WP_ADMIN_PASSWORD de .env.deploy" admin_password_ok
-check "plugins activos (SCF, Redirection, Nested Pages, Two Factor, bp-headless, bp-sitio-en-venta)" "[[ \$(simwp plugin list --status=active --field=name | sort | tr '\\n' ' ') == 'bp-headless bp-sitio-en-venta redirection secure-custom-fields two-factor wp-nested-pages ' ]]"
+check "plugins activos (SCF, Redirection, Nested Pages, Two Factor, Site Reviews, Rank Math, Safe SVG, bp-headless, bp-sitio-en-venta)" "[[ \$(simwp plugin list --status=active --field=name | sort | tr '\\n' ' ') == 'bp-headless bp-sitio-en-venta redirection safe-svg secure-custom-fields seo-by-rank-math site-reviews two-factor wp-nested-pages ' ]]"
 check "tema bp-headless-theme, es_CO, America/Bogota, noindex, /%postname%/" "[[ \$(simwp eval 'echo get_stylesheet(), \"|\", get_locale(), \"|\", get_option(\"timezone_string\"), \"|\", get_option(\"blog_public\"), \"|\", get_option(\"permalink_structure\");') == 'bp-headless-theme|es_CO|America/Bogota|0|/%postname%/' ]]"
 check "sin contenido de ejemplo" "[[ -z \$(simwp post list --post_type=post,page --name=hola-mundo --format=ids) ]]"
 check "API bp/v1/site responde" "[[ \$(simwp eval 'echo rest_do_request(new WP_REST_Request(\"GET\", \"/bp/v1/site\"))->get_status();') == 200 ]]"
