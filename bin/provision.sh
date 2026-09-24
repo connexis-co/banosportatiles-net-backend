@@ -7,7 +7,15 @@ say() { printf '  · %s\n' "$*"; }
 
 # WordPress.org answers 434 to requests whose User-Agent is "WordPress/x; http://localhost:8080",
 # so plugins and translations are fetched as public zips with wget and installed from file.
-fetch() { wget -q -T 90 -O "$2" "$1"; }
+fetch() { # fetch <url> <file>: up to 3 attempts (wordpress.org sometimes refuses a connection)
+  n=1
+  until wget -q -T 90 -O "$2" "$1"; do
+    [ "$n" -ge 3 ] && return 1
+    say "Retrying ($n/3): $1"
+    sleep $((n * 5))
+    n=$((n + 1))
+  done
+}
 
 install_plugin() {
   if ! wp plugin is-installed "$1"; then
