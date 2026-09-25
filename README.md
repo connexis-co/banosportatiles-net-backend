@@ -34,7 +34,7 @@ cd ~/dev/banosportatiles-net/backend   # (también accesible por el symlink de ~
 bin/setup.sh            # idempotente: .env con secretos aleatorios → contenedores → WP instalado → seed importado
 composer install        # Pest, Pint, PHPStan (dev)
 composer check          # pint --test + phpstan (nivel 8) + pest
-tests/smoke.sh          # 170 comprobaciones end-to-end contra el Docker levantado (con el seed-sample)
+tests/smoke.sh          # 188 comprobaciones end-to-end contra el Docker levantado (con el seed-sample)
 deploy/cloudpanel/sim/run.sh   # deploy a CloudPanel simulado en Docker (17 comprobaciones)
 ```
 
@@ -178,7 +178,7 @@ camelCase. Las imágenes son `{src, width, height, alt}` con `src` absoluto al C
 | `GET /node?uri=/ruta/` | pública; `?token=` → borradores | un `Node` (`404` si no está publicado; `400` sin `uri`) |
 | `GET /faqs` | pública | `[{id, q, a, temas[]}]` |
 | `GET /redirects` | pública | `[{from, to, code}]` (Redirection, sin regex) |
-| `POST /leads` | HMAC | `201 {ok, reference}` · `401` firma · `422` validación · `429` límite · `503` sin secreto |
+| `POST /leads` | HMAC | `201 {ok, reference[, ignored]}` · `401` firma · `422` validación · `429` límite · `503` sin secreto |
 | `GET /ratings` | pública | `[{uri, id, ...rating}]` de los nodos con valoraciones habilitadas |
 | `GET /ratings?uri=/ruta/` | pública | `{uri, id, ...rating}` · `404` · `403 {code: "ratings_disabled"}` |
 | `GET /reviews?uri=/ruta/&page=1&per_page=10` | pública | `Review[]` + `X-WP-Total` / `X-WP-TotalPages` (máx. 50) · `403 {code: "reviews_disabled"}` · `404` |
@@ -271,12 +271,15 @@ Una preview añade `"preview": true`.
 | `rating` | si la página tiene estrellas u opiniones | `{stars, reviews, count, average, best: 5, worst: 1, distribution: {"1".."5"}, reviewCount, updated?}` |
 | `reviews` | si la página admite opiniones con texto | últimas 10 aprobadas: `[{id, author, initials, rating, title?, content, date, response?: {content, date?, author}}]`, en texto plano con saltos de línea y sin email ni IP |
 | `toc` | siempre | configuración resuelta: `{enabled, title, depth: 2\|3, min, numbered, collapsedMobile, sticky, exclude[], labels: {id: etiqueta}}` |
+| `lead` | siempre (1.2.0) | CTA «Solicitar cotización»: `{service?: {label, uri}, mode: "modal"\|"page", title?}`. El servicio es el elegido en la caja «Cotización» si es una página de servicio publicada; si no, la propia página en `hub-servicio`/`servicio`, y ninguno en el resto. `label` es el nombre corto (el título sin su complemento: «Biodigestores: precios…» → «Biodigestores», igual que `serviceLabel()` del front). `mode` es el de la página o, si hereda, `/site → forms.cta_mode` |
 
 **`/site`**: `brand.logo` y `brand.logo_dark` (`Image & {svg?}`: si el archivo es SVG, el marcado saneado, máx. 100 KB),
 `header {cta_label, cta_short, cta_href}`, `menus.header[]` con `icon?`, `kind` (`links`, `ciudades`, `servicios` o `blog`) e
 hijos con `icon?` y `group?`, `menus.secondary[] {label, href, icon?}`, `ciudades[].region?`, `legal.telefono`,
 `ratings {enabled, types, minCountForSchema, autoApproveReviews, texts}`, `toc {enabled_types, title, titleBlog, depth, depthBlog?, min, numbered, collapsedMobile, sticky}`,
 `microcopy` (los textos vacíos se omiten para que el front use los suyos) y `seo {siteName, separator, defaultOgImage?}` (de Rank Math si está activo).
+Desde la 1.2.0, `forms {turnstile_site_key, cta_mode: "modal"|"page", modal: {eyebrow, title, subtitle, success}, whatsapp: {bg, text}}`: nunca vacío, con valores por defecto (modal, los textos del front y `#25d366`/`#ffffff`).
+Los colores van en minúsculas `#rrggbb`. `sale_banner.colors` suma `whatsapp_bg` y `whatsapp_text` (bp-sitio-en-venta 1.0.3).
 
 **Valoraciones y opiniones** (Site Reviews detrás de `Reviews\ReviewsGateway`):
 - Cada voto rápido es una reseña **solo con estrellas**: se aprueba sola, va a la categoría «Calificación» y no manda email al admin.
@@ -299,6 +302,8 @@ Ventana: ±5 min. Cada firma se acepta **una sola vez** (anti-replay).
   "nombre": "Ana Pérez", "telefono": "+57 300 123 4567", "email": "ana@example.com",
   "ciudad": "medellin", "servicio": "Alquiler para evento", "mensaje": "4 baños para 300 personas",
   "fecha_evento": "2026-10-15", "cantidad": 4, "pagina": "/alquiler-de-banos-portatiles/medellin/",
+  "origen": "hero", "servicio_uri": "/alquiler-de-banos-portatiles/",
+  "referrer": "https://www.google.com/", "landing": "/alquiler-de-banos-portatiles/medellin/",
   "utm": { "source": "google", "medium": "cpc", "campaign": "medellin", "gclid": "…" },
   "consentimiento": true,
   "consentimiento_comercial": false
@@ -307,12 +312,33 @@ Ventana: ±5 min. Cada firma se acepta **una sola vez** (anti-replay).
 
 Obligatorios: `nombre` (2–120), `telefono` (7–15 dígitos, `+` opcional) y `consentimiento: true` (Ley 1581 de 2012).
 Opcionales: `email`, `ciudad` (≤ 80; si coincide con un slug se asigna el término), `servicio` (≤ 120), `mensaje` (≤ 2000),
-`fecha_evento` (AAAA-MM-DD), `cantidad` (1–10 000), `pagina` (ruta relativa), `utm` (`source, medium, campaign, term, content, gclid, gbraid, wbraid, fbclid`)
+`fecha_evento` (AAAA-MM-DD), `cantidad` (1–10 000), `pagina` (ruta relativa)
 y `consentimiento_comercial` (acepta comunicaciones comerciales; opcional, por defecto `false`).
+
+**Atribución** (1.2.0, opcional). **Nunca rechaza un lead**: lo que no cumple el formato se descarta y la respuesta `201`
+lo lista en `ignored` (p. ej. `["origen", "gclid"]`):
+
+| Campo | Formato |
+|---|---|
+| `origen` | ubicación del CTA (`hero`, `header`, `header_movil`, `menu_movil`, `mega`, `pie`, `aside`, `banner`, `precio`, `cuerpo`, `cotizar`, `contacto`, `hero_formulario`, `cta`…): `[a-z0-9_-]`, máx. 40 |
+| `servicio_uri` | ruta del sitio sin query (`/pozos-septicos/`), máx. 255 |
+| `landing` | primera URI de la sesión (ruta, query opcional), máx. 500 |
+| `referrer` | URL `http(s)`, máx. 500 (si es más larga se guarda sin la query) |
+| `utm.source`, `utm.medium`, `utm.campaign`, `utm.term`, `utm.content` | texto; se recorta a 150 |
+| `utm.gclid`, `utm.gbraid`, `utm.wbraid`, `utm.fbclid` | caracteres seguros de URL, máx. 255 |
+
+El front manda los UTM y los clics dentro del objeto `utm`. También se aceptan en el nivel superior (`utm_source`,
+`gclid`…), que tienen prioridad.
+
+Cada campo se guarda en su propio meta (`_bp_lead_origen`, `_bp_lead_utm_source`…, además del JSON `_bp_lead_utm`). Dónde aparece:
+- El admin de Leads tiene la columna **Origen** («Hero de la página · Google Ads»: botón · canal).
+- El detalle del lead lista la atribución.
+- El email muestra el botón, el servicio y la primera página (con enlace al sitio), el referrer y el **canal**: Google Ads por gclid/gbraid/wbraid, Meta por fbclid, `utm_source / utm_medium`, el dominio del referrer o «Directo».
+- El webhook la manda en `lead.atribucion`, con los mismos nombres.
 
 | Respuesta | Cuándo |
 |---|---|
-| `201 {"ok": true, "reference": "uuid"}` | lead guardado + email (aunque el email falle) + webhook programado |
+| `201 {"ok": true, "reference": "uuid"}` (+ `"ignored": […]` si se descartó atribución) | lead guardado + email (aunque el email falle) + webhook programado |
 | `401 bp_invalid_signature` / `bp_replayed_request` | sin firma, firma inválida, fuera de ventana o reenvío |
 | `422 bp_invalid_lead` + `data.errors {campo: mensaje}` | validación (mensajes en español) |
 | `429 bp_rate_limited` + `Retry-After` | > 5 leads / 10 min por IP del visitante, o > 20 firmas fallidas / 10 min por IP de red |
@@ -367,7 +393,8 @@ sitio» en la barra superior y un widget del dashboard con el último disparo, s
 - **Pasada 1:** ciudades → categorías → FAQs → ajustes → redirecciones → equipos → posts → páginas (por profundidad; padre por `parentUri`, `menu_order` por `order`, plantilla por `template`).
 - **Pasada 2:** relaciones (secciones, FAQs del banco, pilares y relacionados del blog, pilar de cada categoría) y portada (`/`).
 - Imágenes: `image`, `hero.image`, galerías, `og_image`, las imágenes de sección (`image` de steps, cta_banner, rich_text, features_grid y pricing_factors, e `image` de cada ítem de steps y features_grid) y las `<img>` locales dentro de `contentHtml` (con `<figure>`/`<figcaption>` intactos) se suben a la biblioteca desde `--assets` (p. ej. `images/generated/x.jpg`), deduplicadas por SHA-1 (meta `_bp_source_sha1`) y con el `alt` del seed.
-- `site.yaml`: además de marca, contacto, legal, analítica, formularios y menús, importa `header`, `menus.secondary`, `microcopy`, `ratings` y `toc`; `ciudades.yaml` importa `region`.
+- `site.yaml`: además de marca, contacto, legal, analítica, formularios y menús, importa `header`, `menus.secondary`, `microcopy`, `ratings`, `toc` y `forms.cta_mode`, `forms.modal` y `forms.whatsapp`; `ciudades.yaml` importa `region`.
+- Página o equipo: `lead: {service: "/uri/", mode: modal|page|inherit, title}` se escribe en la segunda pasada, solo si el seed lo declara.
 - Por página: `price`, `schema_type`, `toc` y `rating: false` se escriben **solo si el seed los trae** (si no, se conserva lo configurado en WordPress). El seed no trae precios ni valoraciones.
 - Con Rank Math activo, el SEO del seed también se escribe en los meta `rank_math_*`, y `site.seo` (`siteName`, `separator`) en «Títulos y meta» (la fuente de `/site → seo`). `wp bp setup rankmath` solo pone el separador «|» y el nombre de la marca la primera vez: después mandan el editor y el seed.
 
@@ -375,10 +402,10 @@ sitio» en la barra superior y un widget del dashboard con el último disparo, s
 
 | Herramienta | Resultado |
 |---|---|
-| `vendor/bin/pest` | 283 tests / 1270 aserciones (HtmlCleaner, Slugger, UriResolver, HMAC, PreviewToken, validación, email y rate limit de leads, normalizadores, ciudades, round-trip seed → SCF → API, grupos SCF, bundle, HTTP/CORS, SMTP, flags; aviso de venta: saneamiento, E.164, contraste WCAG, forma del REST y exclusión de rutas; 1.1.0: resumen, reseñas, política y controladores HMAC de valoraciones (401, 422, 429, 403, 409, duplicado, actualización del voto), precios, TOC, fuentes de SEO con Rank Math simulado, canonical, migración a Rank Math, `site.seo` → Rank Math y setup sin pisar al editor, sanitizador SVG, menús/textos/regiones, imágenes de sección, deduplicación de medios, huella de las imágenes en el hash del ítem, debounce del deploy y contrato del Node sin `null`) |
+| `vendor/bin/pest` | 306 tests / 1430 aserciones (HtmlCleaner, Slugger, UriResolver, HMAC, PreviewToken, validación, email y rate limit de leads, normalizadores, ciudades, round-trip seed → SCF → API, grupos SCF, bundle, HTTP/CORS, SMTP, flags; aviso de venta: saneamiento, E.164, contraste WCAG, forma del REST y exclusión de rutas; 1.1.0: resumen, reseñas, política y controladores HMAC de valoraciones (401, 422, 429, 403, 409, duplicado, actualización del voto), precios, TOC, fuentes de SEO con Rank Math simulado, canonical, migración a Rank Math, `site.seo` → Rank Math y setup sin pisar al editor, sanitizador SVG, menús/textos/regiones, imágenes de sección, deduplicación de medios, huella de las imágenes en el hash del ítem, debounce del deploy y contrato del Node sin `null`; 1.2.0: atribución del lead (validación tolerante, metas, email, columna «Origen»), `node.lead`, `/site → forms`, selector de servicios, importación de `forms` y `lead`, colores de WhatsApp del aviso de venta) |
 | `vendor/bin/pint --test` | preset laravel + `declare_strict_types` |
 | `vendor/bin/phpstan` | **nivel 8**, `phpVersion` 8.3, con stubs de WordPress, SCF/ACF y WP-CLI, sin baseline ni ignores |
-| `tests/smoke.sh` | 170 comprobaciones end-to-end (endpoints, forma del JSON, ETag/304, invalidación, leads 201/401/422/429, replay, email del lead con To/Cc/Reply-To/HTML, `BP_LEADS_EMAIL=false`, fallo SMTP → `email_failed` → `leads resend`, SMTP con STARTTLS + AUTH obligatorios, webhook firmado, 301 del front, robots, previews, hardening, CORS, deploy hook, aviso de venta: forma, 304, `?path`, fuente única con `/site`, guardar y publicar desde el admin; 1.1.0: plugins y setups idempotentes, ningún `null`, `/site` y Node nuevos, `/ratings` y `/reviews` (304, 403, 404, 400), voto 201 → duplicado 200 → visible en Site Reviews con su categoría y deploy en ventana, opinión 201 pendiente → 409 → actualización del voto, email fuera de la API, vías públicas de Site Reviews cerradas y limpieza con `wp bp reviews purge`) |
+| `tests/smoke.sh` | 188 comprobaciones end-to-end (endpoints, forma del JSON, ETag/304, invalidación, leads 201/401/422/429, replay, email del lead con To/Cc/Reply-To/HTML, `BP_LEADS_EMAIL=false`, fallo SMTP → `email_failed` → `leads resend`, SMTP con STARTTLS + AUTH obligatorios, webhook firmado, 301 del front, robots, previews, hardening, CORS, deploy hook, aviso de venta: forma, 304, `?path`, fuente única con `/site`, guardar y publicar desde el admin; 1.1.0: plugins y setups idempotentes, ningún `null`, `/site` y Node nuevos, `/ratings` y `/reviews` (304, 403, 404, 400), voto 201 → duplicado 200 → visible en Site Reviews con su categoría y deploy en ventana, opinión 201 pendiente → 409 → actualización del voto, email fuera de la API, vías públicas de Site Reviews cerradas y limpieza con `wp bp reviews purge`; 1.2.0: lead con atribución (metas, columna «Origen», email con canal, `ignored`), `/site → forms`, `node.lead` automático y con la caja «Cotización», colores de WhatsApp en `/bp-venta/v1/config`) |
 | `deploy/cloudpanel/sim/run.sh` | 17 comprobaciones del deploy real contra un CloudPanel simulado (pasada nueva, idempotente y `--seed-force`; plugins nuevos, setups y nombre del sitio en Rank Math) |
 
 ## Despliegue

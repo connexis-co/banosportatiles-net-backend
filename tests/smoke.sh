@@ -213,6 +213,23 @@ curl -s "$MAILPIT/api/v1/messages" > "$TMP/body"
 expect_json "llega por SMTP con From/FromName de BP_SMTP_FROM(_NAME)" "(.messages[0].Subject | test(\"contraseña\")) and .messages[0].From.Address == \"${BP_SMTP_FROM:-no-reply@banosportatiles.net}\" and .messages[0].From.Name == \"${BP_SMTP_FROM_NAME:-BañosPortátiles.net}\""
 [[ "$(wp eval 'add_action("phpmailer_init", function ($m) { $m->Password = "incorrecta"; }, 20); echo wp_mail("x@example.com", "t", "b") ? "sent" : "rejected";')" == "rejected" ]] && ok "credenciales SMTP incorrectas → rechazado (AUTH obligatorio)" || ko "AUTH SMTP no se exige"
 
+section "7e. Atribución del lead (origen, servicio, referrer, landing, UTM y clics)"
+ATTR='{"nombre":"Prueba Atribucion","telefono":"3000000003","servicio":"Atribucion smoke","pagina":"/smoke-test/","consentimiento":true,"origen":"hero","servicio_uri":"/alquiler-de-banos-portatiles/","referrer":"https://www.google.com/","landing":"/alquiler-de-banos-portatiles/","utm_source":"google","utm_medium":"cpc","utm_campaign":"smoke","gclid":"EAIaIQobChMI-smoke_1"}'
+ts="$(date +%s)"
+http "lead con atribución → 201" 201 -X POST "$API/leads" -H 'Content-Type: application/json' -H "X-BP-Timestamp: $ts" -H "X-BP-Signature: sha256=$(sign "$ts" "$ATTR")" -H "X-BP-Client-IP: 198.51.100.$((RANDOM % 250 + 1))" --data-binary "$ATTR"
+expect_json "sin campos descartados" '.ok == true and (has("ignored") | not)'
+attr_id="$(wp post list --post_type=lead --post_status=any --meta_key=_bp_lead_telefono --meta_value=3000000003 --field=ID | head -1)"
+[[ "$(wp post meta get "$attr_id" _bp_lead_origen)|$(wp post meta get "$attr_id" _bp_lead_servicio_uri)|$(wp post meta get "$attr_id" _bp_lead_utm_campaign)|$(wp post meta get "$attr_id" _bp_lead_gclid)" == "hero|/alquiler-de-banos-portatiles/|smoke|EAIaIQobChMI-smoke_1" ]] && ok "un meta por campo de atribución" || ko "metas de atribución"
+[[ "$(wp eval "echo BanosPortatiles\\Headless\\Leads\\LeadAttribution::summary(BanosPortatiles\\Headless\\Leads\\LeadRepository::attribution($attr_id));")" == "Hero de la página · Google Ads" ]] && ok "columna «Origen» del admin: Hero de la página · Google Ads" || ko "columna Origen"
+sleep 1
+attr_msg="$(curl -s "$MAILPIT/api/v1/messages" | jq -r '[.messages[] | select(.Subject | test("Atribucion smoke"))][0].ID')"
+curl -s "$MAILPIT/api/v1/message/$attr_msg" > "$TMP/body"
+expect_json "email con botón, servicio, landing, referrer y canal" "(.Text | contains(\"Botón: Hero de la página\")) and (.Text | contains(\"Canal: Google Ads\")) and (.HTML | contains(\"$FRONT/alquiler-de-banos-portatiles/\")) and (.HTML | contains(\"https://www.google.com/\"))"
+BADATTR='{"nombre":"Prueba Atribucion Mala","telefono":"3000000004","pagina":"/smoke-test/","consentimiento":true,"origen":"Hero Principal","referrer":"javascript:alert(1)","gclid":"a b","utm_source":"google"}'
+ts="$(date +%s)"
+http "atribución inválida no bloquea el lead → 201" 201 -X POST "$API/leads" -H 'Content-Type: application/json' -H "X-BP-Timestamp: $ts" -H "X-BP-Signature: sha256=$(sign "$ts" "$BADATTR")" -H "X-BP-Client-IP: 198.51.100.$((RANDOM % 250 + 1))" --data-binary "$BADATTR"
+expect_json "ignored lista lo descartado" '.ignored == ["origen","referrer","gclid"]'
+
 section "8. Headless: redirección del front, noindex y previews"
 http "front del CMS → 301" 301 "$BASE/cualquier/ruta/?utm_source=x"
 expect_header "Location conserva ruta y query" "Location: $FRONT/cualquier/ruta/?utm_source=x"
@@ -381,6 +398,28 @@ for voter in $SMOKE_VOTERS; do wp bp reviews purge --voter="$voter" --yes >/dev/
 SMOKE_VOTERS=""
 [[ "$(wp post list --post_type=site-review --post_status=any --meta_key=_bp_voter --meta_value="$VOTER_A" --format=count)" == "0" ]] && ok "wp bp reviews purge borra los votos de prueba" || ko "purge de votos de prueba"
 wp cron event delete bp_headless_deploy >/dev/null
+
+section "12. CTA de cotización (node.lead y /site → forms)"
+curl -s "$API/site" > "$TMP/body"
+expect_json "/site → forms: cta_mode, textos del modal y colores de WhatsApp" '(.forms.cta_mode | IN("modal","page")) and (.forms.modal | keys) == ["eyebrow","subtitle","success","title"] and ([.forms.modal[]] | all(length > 0)) and (.forms.whatsapp.bg | test("^#[0-9a-f]{6}$")) and (.forms.whatsapp.text | test("^#[0-9a-f]{6}$")) and (.forms | has("turnstile_site_key"))'
+site_mode="$(jq -r .forms.cta_mode "$TMP/body")"
+http "node de servicio" 200 "$API/node?uri=$service_uri"
+expect_json "lead: la propia página es el servicio y el modo es el del sitio" ".lead.service.uri == \"$service_uri\" and (.lead.service.label | length > 0) and .lead.mode == \"$site_mode\" and (.lead | has(\"title\") | not)"
+http "home" 200 "$API/node?uri=/"
+expect_json "home: lead sin servicio" '(.lead | has("service") | not) and (.lead.mode | IN("modal","page"))'
+city_uri="$(jq -r 'map(select(.template == "ciudad"))[0].uri // empty' <<<"$routes")"
+city_id="$(jq -r 'map(select(.template == "ciudad"))[0].id // empty' <<<"$routes")"
+service_id="$(jq -r "map(select(.uri == \"$service_uri\"))[0].id" <<<"$routes")"
+wp eval "update_field('field_bp_lead', ['service' => $service_id, 'mode' => 'page', 'title' => 'Cotiza (smoke)'], $city_id);" >/dev/null
+wp bp cache flush >/dev/null
+http "ciudad con «Cotización» configurada" 200 "$API/node?uri=$city_uri"
+expect_json "lead de la ciudad: servicio elegido, modo página y título" ".lead.service.uri == \"$service_uri\" and .lead.mode == \"page\" and .lead.title == \"Cotiza (smoke)\""
+wp eval "delete_field('field_bp_lead', $city_id);" >/dev/null
+wp bp cache flush >/dev/null
+http "ciudad sin «Cotización»" 200 "$API/node?uri=$city_uri"
+expect_json "lead de la ciudad vuelve a ser automático (sin servicio)" "(.lead | has(\"service\") | not) and .lead.mode == \"$site_mode\""
+[[ "$(wp eval 'echo count((new WP_Query(apply_filters("acf/fields/post_object/query/key=field_bp_lead_service", [], [], 0) + ["posts_per_page" => -1, "fields" => "ids"]))->posts);')" -ge 1 ]] && ok "el selector de servicio solo lista páginas de servicio" || ko "selector de servicio"
+
 
 printf '\n\033[1mResultado: %d OK, %d fallos\033[0m\n' "$PASS" "$FAIL"
 [[ "$FAIL" -eq 0 ]]
