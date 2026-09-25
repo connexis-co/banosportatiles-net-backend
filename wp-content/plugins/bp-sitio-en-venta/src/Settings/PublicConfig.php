@@ -26,6 +26,7 @@ final class PublicConfig
         foreach (self::KEYS as $key) {
             $config[$key] = $settings[$key] ?? Defaults::settings()[$key];
         }
+        $config['colors'] = Defaults::colors($config['colors']);
         // Invariant for every consumer: no number, no WhatsApp button (also before the first save).
         $config['show_whatsapp'] = (bool) $config['show_whatsapp'] && is_string($config['whatsapp_number']) && $config['whatsapp_number'] !== '';
         // Placements are stored as a list; consumers get an explicit object {placement: bool} (same shape as the seed).

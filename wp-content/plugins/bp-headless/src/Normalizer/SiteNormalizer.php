@@ -8,6 +8,7 @@ use BanosPortatiles\Headless\Config;
 use BanosPortatiles\Headless\Content\Taxonomies;
 use BanosPortatiles\Headless\Fields\FieldReader;
 use BanosPortatiles\Headless\Fields\SiteSettings;
+use BanosPortatiles\Headless\Leads\QuoteCta;
 use BanosPortatiles\Headless\Reviews\RatingService;
 use BanosPortatiles\Headless\Routing\UriResolver;
 use BanosPortatiles\Headless\Seo\SiteSeo;
@@ -47,7 +48,7 @@ final class SiteNormalizer
             'social' => $this->social(),
             'legal' => self::pick($this->option('legal'), ['responsable', 'razon_social', 'nit', 'telefono', 'direccion', 'ciudad', 'email_datos']),
             'analytics' => self::pick($this->option('analytics'), ['ga4', 'gtm']),
-            'forms' => self::pick($this->option('forms'), ['turnstile_site_key']),
+            'forms' => QuoteCta::site($this->option('forms')),
         ];
 
         // Single source of truth: the «Sitio en venta» plugin (bp-sitio-en-venta). Omitted when it is not active.

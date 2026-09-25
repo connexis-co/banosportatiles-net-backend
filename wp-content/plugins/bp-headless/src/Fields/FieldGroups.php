@@ -6,6 +6,7 @@ namespace BanosPortatiles\Headless\Fields;
 
 use BanosPortatiles\Headless\Content\PostTypes;
 use BanosPortatiles\Headless\Content\Taxonomies;
+use BanosPortatiles\Headless\Leads\QuoteCta;
 use BanosPortatiles\Headless\Normalizer\PriceNormalizer;
 use BanosPortatiles\Headless\Normalizer\TocResolver;
 use BanosPortatiles\Headless\Reviews\RatingPolicy;
@@ -35,6 +36,7 @@ final class FieldGroups
             self::sections(),
             self::faqs(),
             self::price(),
+            self::lead(),
             self::blog(),
             self::equipo(),
             self::toc(),
@@ -106,6 +108,33 @@ final class FieldGroups
                 'instructions' => 'Automático recomendado: Google muestra estrellas y precio para Product, no para Service.',
             ]),
         ], ['menu_order' => 3]);
+    }
+
+    /**
+     * «Cotización» (sidebar) of commercial pages and equipos: the service preloaded in the quote form, whether
+     * the «Solicitar cotización» buttons open the modal or go to /cotizar/, and an optional modal title.
+     * Resolved into node.lead by Leads\QuoteCta (the service list is limited to service pages by QuoteCtaAdmin).
+     *
+     * @return array<string, mixed>
+     */
+    public static function lead(): array
+    {
+        $f = new FieldBuilder;
+        $templates = array_values(array_filter(QuoteCta::TEMPLATES, static fn (string $t): bool => $t !== PostTypes::EQUIPO));
+        $location = [
+            ...array_map(static fn (string $template): array => [['param' => 'page_template', 'operator' => '==', 'value' => $template]], $templates),
+            [['param' => 'post_type', 'operator' => '==', 'value' => PostTypes::EQUIPO]],
+        ];
+
+        return self::group('lead', 'Cotización', $location, [
+            $f->group('lead', 'Cotización', static fn (FieldBuilder $l): array => [
+                $l->postObject('service', 'Servicio que se precarga', ['page'], [
+                    'instructions' => 'Vacío = automático: en un hub de servicio o un servicio, la propia página; en ciudades y equipos, ninguno (lo elige la persona).',
+                ]),
+                $l->select('mode', 'Botones «Solicitar cotización»', QuoteCta::PAGE_MODES, ['default_value' => QuoteCta::INHERIT]),
+                $l->text('title', 'Título de la ventana', ['maxlength' => QuoteCta::MAX_TITLE, 'instructions' => 'Opcional. Vacío = el título de Ajustes del sitio → Formularios.']),
+            ]),
+        ], ['position' => 'side', 'menu_order' => 6]);
     }
 
     /**
@@ -367,7 +396,8 @@ final class FieldGroups
      */
     public static function group(string $key, string $title, array $location, array $fields, array $extra = []): array
     {
-        return [
+        // $extra wins (e.g. 'position' => 'side'); before, "+" kept the default 'normal'.
+        return $extra + [
             'key' => 'group_bp_'.$key,
             'title' => $title,
             'fields' => $fields,
@@ -378,7 +408,7 @@ final class FieldGroups
             'instruction_placement' => 'label',
             'active' => true,
             'show_in_rest' => 0,
-        ] + $extra;
+        ];
     }
 
     /**

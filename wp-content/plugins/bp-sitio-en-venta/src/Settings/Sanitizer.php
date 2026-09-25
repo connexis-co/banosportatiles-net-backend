@@ -84,7 +84,7 @@ final class Sanitizer
 
         $colors = [];
         $inputColors = is_array($input['colors'] ?? null) ? $input['colors'] : [];
-        $currentColors = is_array($current['colors']) ? $current['colors'] : Defaults::COLORS;
+        $currentColors = Defaults::colors($current['colors']);
         foreach (Defaults::COLORS as $key => $default) {
             $raw = $inputColors[$key] ?? null;
             $color = is_string($raw) ? Contrast::normalizeHex($raw) : null;

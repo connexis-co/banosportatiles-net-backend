@@ -6,6 +6,7 @@ namespace BanosPortatiles\Headless\Import;
 
 use BanosPortatiles\Headless\Fields\FieldGroups;
 use BanosPortatiles\Headless\Fields\SiteSettings;
+use BanosPortatiles\Headless\Leads\QuoteCta;
 use BanosPortatiles\Headless\Normalizer\PriceNormalizer;
 use BanosPortatiles\Headless\Normalizer\TocResolver;
 use BanosPortatiles\Headless\Reviews\RatingSettings;
@@ -320,6 +321,10 @@ final class FieldValueMapper
             }
         }
 
+        if (isset($site['forms']) && is_array($site['forms'])) {
+            $values['forms'] = ($values['forms'] ?? []) + $this->forms($site['forms']);
+        }
+
         foreach (['logo', 'logo_dark'] as $logo) {
             if (isset($site['brand']) && is_array($site['brand']) && array_key_exists($logo, $site['brand'])) {
                 $image = $site['brand'][$logo];
@@ -370,6 +375,75 @@ final class FieldValueMapper
         $flag = static fn (string $key): string => array_key_exists($key, $rating) ? (Arr::bool($rating, $key) ? 'yes' : 'no') : 'inherit';
 
         return ['stars' => $flag('stars'), 'reviews' => $flag('reviews')];
+    }
+
+    /**
+     * «Cotización» of a page or equipo (null when the seed does not declare "lead"):
+     * lead: {service: "/uri/" | {uri}, mode: modal | page | inherit, title}. The service must be a page of the
+     * seed (resolved in the second pass, when every page exists).
+     *
+     * @param  array<array-key, mixed>  $item
+     * @return array{service: int|string, mode: string, title: string}|null
+     */
+    public function lead(array $item): ?array
+    {
+        $lead = $item['lead'] ?? null;
+        if (! is_array($lead)) {
+            return null;
+        }
+        $service = $lead['service'] ?? null;
+        $uri = is_array($service) ? Arr::string($service, 'uri') : (is_string($service) ? trim($service) : '');
+        $serviceId = '';
+        if ($uri !== '') {
+            $serviceId = $this->lookup->pageId($uri) ?? '';
+            if ($serviceId === '') {
+                ($this->warn)("lead.service: no hay una página {$uri} en el seed (se deja automático).");
+            }
+        }
+        $mode = Arr::string($lead, 'mode');
+        $resolved = $mode === '' || $mode === QuoteCta::INHERIT || $mode === 'heredar' ? QuoteCta::INHERIT : QuoteCta::mode($mode);
+        if ($resolved === null) {
+            ($this->warn)("lead.mode «{$mode}» no válido: usa modal, page o inherit.");
+        }
+
+        return ['service' => $serviceId, 'mode' => $resolved ?? QuoteCta::INHERIT, 'title' => Arr::string($lead, 'title')];
+    }
+
+    /**
+     * site.yaml → forms: cta_mode (modal | page), modal texts and WhatsApp colors (only the keys present).
+     *
+     * @param  array<array-key, mixed>  $forms
+     * @return array<string, mixed>
+     */
+    private function forms(array $forms): array
+    {
+        $values = [];
+        if (array_key_exists('cta_mode', $forms)) {
+            $mode = QuoteCta::mode(Arr::string($forms, 'cta_mode'));
+            if ($mode === null) {
+                ($this->warn)(sprintf('forms.cta_mode «%s» no válido: usa modal o page (se usa %s).', Arr::string($forms, 'cta_mode'), QuoteCta::DEFAULT_MODE));
+            }
+            $values['cta_mode'] = $mode ?? QuoteCta::DEFAULT_MODE;
+        }
+        if (isset($forms['modal']) && is_array($forms['modal'])) {
+            foreach (array_keys(QuoteCta::MODAL_DEFAULTS) as $key) {
+                $text = $forms['modal'][$key] ?? null;
+                // success may come as {title, text} (front schema); the text is what is stored.
+                $values['modal'][$key] = is_array($text) ? Arr::string($text, 'text') : Arr::string($forms['modal'], $key);
+            }
+        }
+        if (isset($forms['whatsapp']) && is_array($forms['whatsapp'])) {
+            foreach (['bg', 'text'] as $key) {
+                $raw = $forms['whatsapp'][$key] ?? null;
+                $color = QuoteCta::color($raw);
+                if ($raw !== null && $raw !== '' && $color === null) {
+                    ($this->warn)(sprintf('forms.whatsapp.%s: color no válido (usa #rrggbb); se usa el de WhatsApp.', $key));
+                }
+                $values['whatsapp'][$key] = $color ?? '';
+            }
+        }
+
+        return $values;
     }
 
     /**

@@ -156,10 +156,10 @@ final class SettingsPage
             $this->text('secondary_label', 'Texto del botón', (string) $s['secondary_label'], Sanitizer::LABEL_MAX);
             $this->text('secondary_url', 'Enlace', (string) $s['secondary_url'], 255, Defaults::SECONDARY_URL, 'text', 'Ruta del sitio (/sitio-en-venta/) o URL completa https://.');
         });
-        $this->card('Colores', 'Se revisa el contraste con WCAG AA: 4,5:1 para textos y 3:1 para el botón sobre el fondo.', function () use ($s): void {
-            $colors = is_array($s['colors']) ? $s['colors'] : Defaults::COLORS;
+        $this->card('Colores', 'Se revisa el contraste con WCAG AA: 4,5:1 para textos y 3:1 para los botones sobre el fondo. El botón de WhatsApp usa por defecto los colores oficiales (#25D366 con texto blanco), que no llegan a 4,5:1.', function () use ($s): void {
+            $colors = Defaults::colors($s['colors']);
             echo '<div class="bpsev-colors">';
-            foreach (['bg' => 'Fondo', 'text' => 'Texto', 'accent' => 'Botón', 'accent_text' => 'Texto del botón'] as $key => $label) {
+            foreach (['bg' => 'Fondo', 'text' => 'Texto', 'accent' => 'Acento (etiqueta y foco)', 'accent_text' => 'Texto de la etiqueta', 'whatsapp_bg' => 'Botón de WhatsApp', 'whatsapp_text' => 'Texto del botón de WhatsApp'] as $key => $label) {
                 printf(
                     '<div class="bpsev-field"><label for="bpsev-color-%1$s">%2$s</label><input type="text" id="bpsev-color-%1$s" name="bpsev[colors][%1$s]" value="%3$s" class="bpsev-color" data-bpsev-color="%1$s" data-default-color="%4$s"></div>',
                     esc_attr($key),
@@ -219,13 +219,15 @@ final class SettingsPage
      */
     private function preview(array $s): void
     {
-        $colors = is_array($s['colors']) ? $s['colors'] : Defaults::COLORS;
+        $colors = Defaults::colors($s['colors']);
         $style = sprintf(
-            '--bpv-bg:%s;--bpv-text:%s;--bpv-accent:%s;--bpv-accent-text:%s',
-            esc_attr((string) ($colors['bg'] ?? '')),
-            esc_attr((string) ($colors['text'] ?? '')),
-            esc_attr((string) ($colors['accent'] ?? '')),
-            esc_attr((string) ($colors['accent_text'] ?? ''))
+            '--bpv-bg:%s;--bpv-text:%s;--bpv-accent:%s;--bpv-accent-text:%s;--bpv-wa-bg:%s;--bpv-wa-text:%s',
+            esc_attr($colors['bg']),
+            esc_attr($colors['text']),
+            esc_attr($colors['accent']),
+            esc_attr($colors['accent_text']),
+            esc_attr($colors['whatsapp_bg']),
+            esc_attr($colors['whatsapp_text'])
         );
         $buttons = sprintf(
             '<a class="bpv-btn bpv-btn--wa" href="#" target="_blank" rel="noopener" data-bpv-show="show_whatsapp" data-bpv-link="whatsapp">%s<span data-bpv-text="cta_whatsapp_label">%s</span></a>'

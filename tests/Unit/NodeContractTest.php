@@ -125,7 +125,7 @@ it('never puts null in a Node (top level, seo, price, rating, reviews, toc)', fu
         $node = $normalizer->normalize($post);
 
         expect(nullPaths($node))->toBe([], $label)
-            ->and($node)->toHaveKeys(['seo', 'schemaType', 'toc'])
+            ->and($node)->toHaveKeys(['seo', 'schemaType', 'toc', 'lead'])
             ->and($node)->not->toHaveKey('price')
             ->and($node['seo'])->toHaveKey('source');
     }
@@ -135,3 +135,28 @@ it('never puts null in a Node (top level, seo, price, rating, reviews, toc)', fu
         ->and($post['reviews'])->toHaveCount(1)
         ->and($normalizer->normalize($nodes['city page']))->toHaveKey('rating')->not->toHaveKey('reviews');
 })->with(['SCF' => [false], 'Rank Math' => [true]]);
+
+it('resolves node.lead: chosen service, automatic service on service pages, mode and stale values', function (): void {
+    $normalizer = nodeNormalizer([
+        'bp_site' => ['forms' => ['cta_mode' => 'page']],
+        12 => ['lead' => ['service' => 11, 'mode' => 'modal', 'title' => 'Cotiza en Medellín']],
+        11 => ['lead' => ['service' => '', 'mode' => 'inherit', 'title' => '']],
+        7 => ['lead' => ['service' => 99, 'mode' => 'inherit', 'title' => '']],
+        9 => ['lead' => ['service' => 11, 'mode' => 'modal', 'title' => 'Obsoleto']],
+    ]);
+    $service = new WP_Post(['ID' => 11, 'post_type' => 'page', 'post_name' => 'alquiler-de-banos-portatiles', 'post_title' => 'Alquiler de baños portátiles: eventos, obras y fincas']);
+    $notService = new WP_Post(['ID' => 99, 'post_type' => 'page', 'post_name' => 'nosotros', 'post_title' => 'Nosotros']);
+    Functions\when('get_post')->alias(static fn (mixed $post): mixed => $post instanceof WP_Post ? $post : [11 => $service, 99 => $notService][(int) $post] ?? null);
+
+    $city = $normalizer->normalize(new WP_Post(['ID' => 12, 'post_type' => 'page', 'post_name' => 'medellin', 'post_title' => 'Medellín']));
+    $hub = $normalizer->normalize($service);
+    $equipo = $normalizer->normalize(new WP_Post(['ID' => 7, 'post_type' => 'equipo', 'post_name' => 'bano-portatil-estandar', 'post_title' => 'Baño estándar']));
+    $post = $normalizer->normalize(new WP_Post(['ID' => 9, 'post_type' => 'post', 'post_name' => 'pozo-septico-guia', 'post_title' => 'Pozo séptico']));
+
+    $alquiler = ['label' => 'Alquiler de baños portátiles', 'uri' => '/alquiler-de-banos-portatiles/'];
+    expect($city['lead'])->toBe(['service' => $alquiler, 'mode' => 'modal', 'title' => 'Cotiza en Medellín'])
+        ->and($hub['lead'])->toBe(['service' => $alquiler, 'mode' => 'page'])
+        ->and($equipo['lead'])->toBe(['mode' => 'page'])
+        ->and($post['lead'])->toBe(['mode' => 'page'])
+        ->and(nullPaths($city))->toBe([]);
+});

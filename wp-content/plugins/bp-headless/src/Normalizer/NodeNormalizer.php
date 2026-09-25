@@ -10,6 +10,7 @@ use BanosPortatiles\Headless\Content\PostTypes;
 use BanosPortatiles\Headless\Content\Taxonomies;
 use BanosPortatiles\Headless\Fields\FieldReader;
 use BanosPortatiles\Headless\Html\ContentRenderer;
+use BanosPortatiles\Headless\Leads\QuoteCta;
 use BanosPortatiles\Headless\Reviews\RatingService;
 use BanosPortatiles\Headless\Routing\UriResolver;
 use BanosPortatiles\Headless\Support\Arr;
@@ -29,6 +30,8 @@ final class NodeNormalizer
     private mixed $tocSettings = null;
 
     private bool $tocLoaded = false;
+
+    private ?string $ctaMode = null;
 
     public function __construct(
         private readonly FieldReader $fields,
@@ -111,11 +114,54 @@ final class NodeNormalizer
         // "rating" and "reviews" only when this node has ratings (Site Reviews active + policy).
         $node += $this->ratings->forNode($post);
         $node['toc'] = TocResolver::resolve($this->tocSettings(), $this->fields->get('toc', $id), $node['template']);
+        $node['lead'] = $this->lead($post, $node['template'], $title, $uri);
         if ($preview) {
             $node['preview'] = true;
         }
 
         return $node;
+    }
+
+    /**
+     * node.lead: service preloaded in the quote form, CTA mode and optional modal title (see QuoteCta).
+     *
+     * @return array{service?: array{label: string, uri: string}, mode: string, title?: string}
+     */
+    private function lead(\WP_Post $post, string $template, string $title, string $uri): array
+    {
+        $local = QuoteCta::supports($template) ? $this->fields->get('lead', $post->ID) : null;
+        $chosen = is_array($local) ? $this->service($local['service'] ?? null, $post->ID) : null;
+
+        return QuoteCta::resolve($this->ctaMode(), $local, $template, ['label' => QuoteCta::serviceLabel($title), 'uri' => $uri], $chosen);
+    }
+
+    /**
+     * The service picked in «Cotización» when it is still a published hub-servicio / servicio page.
+     *
+     * @return array{label: string, uri: string}|null
+     */
+    private function service(mixed $value, int $self): ?array
+    {
+        $id = is_numeric($value) ? (int) $value : ($value instanceof \WP_Post ? $value->ID : 0);
+        $service = $id > 0 && $id !== $self ? get_post($id) : null;
+        if (! $service instanceof \WP_Post || $service->post_type !== 'page' || $service->post_status !== 'publish'
+            || ! QuoteCta::isServiceTemplate(PageTemplates::slugFor($service))) {
+            return null;
+        }
+        $uri = $this->uris->forPost($service);
+
+        return $uri !== null ? ['label' => QuoteCta::serviceLabel(self::decode($service->post_title)), 'uri' => $uri] : null;
+    }
+
+    /** «Ajustes del sitio → Formularios → Botones», read once per request. */
+    private function ctaMode(): string
+    {
+        if ($this->ctaMode === null) {
+            $forms = $this->fields->get('forms', Config::OPTIONS_ID);
+            $this->ctaMode = QuoteCta::site(is_array($forms) ? $forms : [])['cta_mode'];
+        }
+
+        return $this->ctaMode;
     }
 
     /** «Ajustes del sitio → Tabla de contenidos», read once per request. */

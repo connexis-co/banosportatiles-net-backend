@@ -19,18 +19,19 @@ it('applies the AA thresholds (4.5:1 text, 3:1 UI)', function (): void {
         ->and(Contrast::ratio('#777777', '#ffffff'))->toBeLessThan(Contrast::AA_TEXT);
 });
 
-it('reports every pair of the banner and passes with the default palette', function (): void {
+it('reports every pair of the banner; the official WhatsApp colors are the only default below AA', function (): void {
     $report = Contrast::report(Defaults::COLORS);
 
-    expect(array_column($report, 'pair'))->toBe(['text/bg', 'accent_text/accent', 'accent/bg'])
-        ->and(array_column($report, 'ok'))->toBe([true, true, true])
-        ->and(array_column($report, 'minimum'))->toBe([4.5, 4.5, 3.0]);
+    expect(array_column($report, 'pair'))->toBe(['text/bg', 'accent_text/accent', 'accent/bg', 'whatsapp_text/whatsapp_bg', 'whatsapp_bg/bg'])
+        ->and(array_column($report, 'ok'))->toBe([true, true, true, false, true])
+        ->and(array_column($report, 'minimum'))->toBe([4.5, 4.5, 3.0, 4.5, 3.0])
+        ->and($report[3]['ratio'])->toBe(1.98);
 });
 
 it('flags a palette that fails AA', function (): void {
-    $report = Contrast::report(['bg' => '#ffffff', 'text' => '#bbbbbb', 'accent' => '#25d366', 'accent_text' => '#ffffff']);
+    $report = Contrast::report(['bg' => '#ffffff', 'text' => '#bbbbbb', 'accent' => '#25d366', 'accent_text' => '#ffffff', 'whatsapp_bg' => '#25d366', 'whatsapp_text' => '#ffffff']);
 
-    expect(array_column($report, 'ok'))->toBe([false, false, false]);
+    expect(array_column($report, 'ok'))->toBe([false, false, false, false, false]);
 });
 
 it('normalizes hex colors', function (): void {

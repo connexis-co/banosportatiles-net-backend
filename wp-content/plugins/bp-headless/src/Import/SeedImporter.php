@@ -96,6 +96,7 @@ final class SeedImporter implements SeedLookup
         }
 
         $this->linkPages($bundle->list('pages'));
+        $this->linkEquipos($bundle->list('equipos'));
         $this->linkPosts($bundle->list('posts'));
         $this->linkCategorias($bundle->list('categorias'));
         $this->setFrontPage();
@@ -379,6 +380,32 @@ final class SeedImporter implements SeedLookup
             }
             update_field($root->key('sections'), $this->mapper->sections(Arr::rows($item, 'sections')), $id);
             update_field($root->key('faq_refs'), $this->mapper->faqRefs($item), $id);
+            $this->writeLead($id, $item);
+        }
+    }
+
+    /**
+     * «Cotización» of a page or equipo, only when the seed declares "lead" (second pass: its service page may
+     * be imported after it).
+     *
+     * @param  array<array-key, mixed>  $item
+     */
+    private function writeLead(int $id, array $item): void
+    {
+        $lead = $this->mapper->lead($item);
+        if ($lead !== null) {
+            update_field((new FieldBuilder)->key('lead'), $lead, $id);
+        }
+    }
+
+    /** @param list<array<array-key, mixed>> $items */
+    private function linkEquipos(array $items): void
+    {
+        foreach ($items as $item) {
+            $id = $this->equipos[Arr::string($item, 'slug')] ?? null;
+            if ($id !== null) {
+                $this->writeLead($id, $item);
+            }
         }
     }
 

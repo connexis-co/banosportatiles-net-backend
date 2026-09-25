@@ -35,7 +35,10 @@ final class Store
         $stored = is_array($stored) ? $stored : [];
         $modo = is_string($stored['modo'] ?? null) ? $stored['modo'] : 'venta';
 
-        return array_replace(Defaults::settings($modo), array_intersect_key($stored, Defaults::settings()));
+        $settings = array_replace(Defaults::settings($modo), array_intersect_key($stored, Defaults::settings()));
+        $settings['colors'] = Defaults::colors($settings['colors']);
+
+        return $settings;
     }
 
     /**

@@ -33,6 +33,7 @@ use BanosPortatiles\Headless\Leads\LeadNotifier;
 use BanosPortatiles\Headless\Leads\LeadRepository;
 use BanosPortatiles\Headless\Leads\LeadValidator;
 use BanosPortatiles\Headless\Leads\LeadWebhook;
+use BanosPortatiles\Headless\Leads\QuoteCtaAdmin;
 use BanosPortatiles\Headless\Leads\RateLimiter;
 use BanosPortatiles\Headless\Mail\SmtpMailer;
 use BanosPortatiles\Headless\Normalizer\CiudadNormalizer;
@@ -184,6 +185,7 @@ final class Plugin
             new SecurityHeaders,
             new PageColumns($config, $uris),
             new LeadAdmin,
+            new QuoteCtaAdmin,
             new AdminCleanup($config),
             new SmtpMailer($config),
             $reviewsGuard,

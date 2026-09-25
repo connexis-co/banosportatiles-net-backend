@@ -49,6 +49,8 @@ final class LeadWebhook implements Hookable
         $utm = json_decode(LeadRepository::meta($leadId, 'utm'), true);
         $lead['utm'] = is_array($utm) ? $utm : [];
         $lead['consentimiento_comercial'] = LeadRepository::meta($leadId, 'consentimiento_comercial') === '1';
+        // Attribution with its contract names (origen, servicio_uri, referrer, landing, utm_*, click ids).
+        $lead['atribucion'] = (object) LeadRepository::attribution($leadId);
 
         $body = (string) wp_json_encode([
             'event' => 'lead.created',

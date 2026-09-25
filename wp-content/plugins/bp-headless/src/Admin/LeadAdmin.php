@@ -6,10 +6,12 @@ namespace BanosPortatiles\Headless\Admin;
 
 use BanosPortatiles\Headless\Content\PostTypes;
 use BanosPortatiles\Headless\Contracts\Hookable;
+use BanosPortatiles\Headless\Leads\LeadAttribution;
 use BanosPortatiles\Headless\Leads\LeadRepository;
 
 /**
- * Leads admin: useful list columns, a read-only data box and a sales status (nuevo → cerrado).
+ * Leads admin: useful list columns (incl. «Origen»: CTA location · channel), a read-only data box with the
+ * attribution and a sales status (nuevo → cerrado).
  */
 final class LeadAdmin implements Hookable
 {
@@ -18,7 +20,7 @@ final class LeadAdmin implements Hookable
     private const FIELDS = [
         'nombre' => 'Nombre', 'telefono' => 'Teléfono', 'email' => 'Email', 'ciudad' => 'Ciudad',
         'servicio' => 'Servicio', 'fecha_evento' => 'Fecha del evento', 'cantidad' => 'Cantidad',
-        'mensaje' => 'Mensaje', 'pagina' => 'Página de origen', 'utm' => 'UTM', 'consentimiento' => 'Consentimiento (fecha)',
+        'mensaje' => 'Mensaje', 'pagina' => 'Página de origen', 'consentimiento' => 'Consentimiento (fecha)',
         'consentimiento_comercial' => 'Acepta comunicaciones comerciales (1 = sí)',
         'ref' => 'Referencia', 'status' => 'Estado del email', 'email_error' => 'Error del email',
         'email_attempts' => 'Intentos de envío', 'webhook' => 'Webhook',
@@ -44,6 +46,7 @@ final class LeadAdmin implements Hookable
             'bp_phone' => 'Teléfono',
             'bp_email' => 'Email',
             'bp_service' => 'Servicio',
+            'bp_origin' => 'Origen',
             'bp_status' => 'Estado',
             'bp_email_status' => 'Aviso',
             'date' => $columns['date'] ?? 'Fecha',
@@ -56,6 +59,7 @@ final class LeadAdmin implements Hookable
             'bp_phone' => LeadRepository::meta($postId, 'telefono'),
             'bp_email' => LeadRepository::meta($postId, 'email'),
             'bp_service' => LeadRepository::meta($postId, 'servicio'),
+            'bp_origin' => LeadAttribution::summary(LeadRepository::attribution($postId)),
             'bp_status' => LeadRepository::STATES[LeadRepository::meta($postId, 'estado')] ?? 'Nuevo',
             'bp_email_status' => match (LeadRepository::meta($postId, 'status')) {
                 'email_sent' => 'Enviado',
@@ -86,9 +90,20 @@ final class LeadAdmin implements Hookable
     public function renderData(\WP_Post $post): void
     {
         echo '<table class="widefat striped"><tbody>';
-        foreach (self::FIELDS as $key => $label) {
-            $value = LeadRepository::meta($post->ID, $key);
+        $row = static function (string $label, string $value): void {
             printf('<tr><th style="width:30%%">%s</th><td>%s</td></tr>', esc_html($label), nl2br(esc_html($value !== '' ? $value : '—')));
+        };
+        foreach (self::FIELDS as $key => $label) {
+            $row($label, LeadRepository::meta($post->ID, $key));
+            if ($key !== 'pagina') {
+                continue;
+            }
+            // Attribution right after the page: CTA location, channel and the fields that were sent.
+            $attribution = LeadRepository::attribution($post->ID);
+            $row('Canal', LeadAttribution::channel($attribution));
+            foreach ($attribution as $name => $value) {
+                $row(LeadAttribution::LABELS[$name] ?? $name, $name === 'origen' ? LeadAttribution::origin($value).' ('.$value.')' : $value);
+            }
         }
         echo '</tbody></table><p class="description">Datos personales tratados según la Ley 1581 de 2012. No los compartas fuera de los proveedores autorizados.</p>';
     }

@@ -45,6 +45,7 @@ final class LeadNotifier
             'origin' => $lead->pagina !== null ? $this->config->frontendUrl().$lead->pagina : null,
             'admin' => admin_url('post.php?post='.$leadId.'&action=edit'),
             'site' => wp_specialchars_decode((string) get_bloginfo('name'), ENT_QUOTES),
+            'front' => $this->config->frontendUrl(),
         ]);
 
         $headers = ['Content-Type: text/html; charset=UTF-8'];
