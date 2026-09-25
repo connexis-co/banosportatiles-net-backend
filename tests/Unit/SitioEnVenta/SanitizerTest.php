@@ -113,3 +113,59 @@ it('accepts relative and absolute secondary URLs only', function (string $url, b
     ['ftp://example.com/', false],
     ['/con espacio/', false],
 ]);
+
+it('keeps the default texts of every mode within their limits and explicit about the WhatsApp', function (string $modo): void {
+    $texts = Defaults::texts($modo);
+
+    expect(mb_strlen($texts['headline']))->toBeLessThanOrEqual(Sanitizer::HEADLINE_MAX)
+        ->and(mb_strlen($texts['message']))->toBeLessThanOrEqual(Sanitizer::MESSAGE_MAX)
+        ->and(mb_strlen($texts['cta_whatsapp_label']))->toBeLessThanOrEqual(Sanitizer::LABEL_MAX)
+        ->and(mb_strlen($texts['cta_whatsapp_short']))->toBeLessThanOrEqual(Sanitizer::SHORT_LABEL_MAX)
+        ->and(mb_strlen($texts['whatsapp_note']))->toBeLessThanOrEqual(Sanitizer::NOTE_MAX)
+        ->and(mb_strlen($texts['whatsapp_message']))->toBeLessThanOrEqual(Sanitizer::WHATSAPP_MESSAGE_MAX)
+        ->and(mb_strlen($texts['secondary_label']))->toBeLessThanOrEqual(Sanitizer::LABEL_MAX)
+        ->and($texts['message'])->toContain('El WhatsApp es solo para negociar el sitio')
+        ->and($texts['whatsapp_message'])->toContain('No es para cotizar baños portátiles')
+        ->and($texts['whatsapp_note'])->toContain('Para cotizar baños portátiles usa el formulario');
+})->with(array_keys(Defaults::MODES));
+
+it('uses the requested texts for «venta o alquiler»', function (): void {
+    expect(Defaults::texts('venta_o_alquiler'))->toBe([
+        'headline' => 'Este sitio web está en venta o alquiler',
+        'message' => '¿Tienes una empresa de baños portátiles o saneamiento? Compra o arrienda este sitio web: dominio, contenido y posicionamiento. El WhatsApp es solo para negociar el sitio.',
+        'whatsapp_message' => 'Hola, me interesa comprar o alquilar el sitio web {sitio} (dominio, contenido y posicionamiento). No es para cotizar baños portátiles. Lo vi en {url}',
+        'cta_whatsapp_label' => 'WhatsApp: comprar este sitio',
+        'cta_whatsapp_short' => 'Comprar sitio',
+        'whatsapp_note' => 'Solo para comprar o alquilar este sitio web. Para cotizar baños portátiles usa el formulario.',
+        'secondary_label' => 'Ver detalles de la venta',
+    ]);
+});
+
+it('validates the short label (≤ 18) and the note (≤ 140), with the mode defaults when empty', function (): void {
+    $ok = sanitizeVenta(['modo' => 'alquiler', 'cta_whatsapp_short' => ' Arrendar web ', 'whatsapp_note' => 'Solo para el sitio web.']);
+    $long = sanitizeVenta(['cta_whatsapp_short' => str_repeat('x', 19), 'whatsapp_note' => str_repeat('y', 141)]);
+    $empty = sanitizeVenta(['modo' => 'alquiler', 'cta_whatsapp_short' => '', 'whatsapp_note' => '']);
+
+    expect($ok->errors)->toBe([])
+        ->and($ok->settings)->toMatchArray(['cta_whatsapp_short' => 'Arrendar web', 'whatsapp_note' => 'Solo para el sitio web.'])
+        ->and(array_keys($long->errors))->toBe(['cta_whatsapp_short', 'whatsapp_note'])
+        ->and($long->settings['cta_whatsapp_short'])->toBe(Defaults::texts('venta')['cta_whatsapp_short'])
+        ->and($empty->settings)->toMatchArray(['cta_whatsapp_short' => 'Alquilar sitio', 'whatsapp_note' => Defaults::texts('alquiler')['whatsapp_note']]);
+});
+
+it('imports the new fields from the seed (site.yaml → sale_banner, partial update)', function (): void {
+    $seed = [
+        'enabled' => true, 'modo' => 'venta_o_alquiler', 'whatsapp_number' => '+573002888757', 'show_whatsapp' => true,
+        'cta_whatsapp_short' => 'Comprar sitio', 'whatsapp_note' => 'Solo para comprar o alquilar este sitio web.',
+        'placements' => ['top_bar' => true, 'sidebar_card' => true],
+    ];
+    $result = (new Sanitizer)->sanitize($seed, Defaults::settings('venta_o_alquiler'), true);
+
+    expect($result->errors)->toBe([])
+        ->and($result->settings)->toMatchArray([
+            'cta_whatsapp_short' => 'Comprar sitio',
+            'whatsapp_note' => 'Solo para comprar o alquilar este sitio web.',
+            'headline' => 'Este sitio web está en venta o alquiler',
+            'placements' => ['top_bar', 'sidebar_card'],
+        ]);
+});

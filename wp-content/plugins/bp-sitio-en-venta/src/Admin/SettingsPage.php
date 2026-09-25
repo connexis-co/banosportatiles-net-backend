@@ -143,11 +143,13 @@ final class SettingsPage
             $this->text('headline', 'Titular', (string) $s['headline'], Sanitizer::HEADLINE_MAX);
             $this->textarea('message', 'Mensaje', (string) $s['message'], Sanitizer::MESSAGE_MAX, 3);
         });
-        $this->card('WhatsApp', 'Único número de WhatsApp del sitio: solo aparece en este aviso.', function () use ($s): void {
+        $this->card('WhatsApp', 'Único número de WhatsApp del sitio: solo aparece en este aviso y es SOLO para comprar o alquilar el sitio web (no para cotizar baños portátiles).', function () use ($s): void {
             $this->toggle('show_whatsapp', 'Mostrar el botón de WhatsApp', (bool) $s['show_whatsapp']);
             $this->text('whatsapp_number', 'Número (formato internacional E.164)', Phone::display((string) $s['whatsapp_number']), 20, '+57 300 123 4567', 'tel', 'Con indicativo de país: +57 3XX XXX XXXX. Un celular colombiano de 10 dígitos se completa con +57.');
             echo '<p class="bpsev-hint" data-bpsev-phone-hint aria-live="polite"></p>';
             $this->text('cta_whatsapp_label', 'Texto del botón', (string) $s['cta_whatsapp_label'], Sanitizer::LABEL_MAX);
+            $this->text('cta_whatsapp_short', 'Texto corto del botón (barra en móvil)', (string) $s['cta_whatsapp_short'], Sanitizer::SHORT_LABEL_MAX);
+            $this->text('whatsapp_note', 'Aviso junto al botón', (string) $s['whatsapp_note'], Sanitizer::NOTE_MAX, '', 'text', 'Deja claro que el WhatsApp no es para cotizar baños portátiles.');
             $this->textarea('whatsapp_message', 'Mensaje prellenado', (string) $s['whatsapp_message'], Sanitizer::WHATSAPP_MESSAGE_MAX, 3, 'Usa {sitio} para el nombre del sitio y {url} para la página desde la que escriben.');
             echo '<p class="bpsev-hint">Enlace resultante: <a href="#" target="_blank" rel="noopener" data-bpsev-wa-test>probar en WhatsApp</a></p>';
         });
@@ -240,6 +242,7 @@ final class SettingsPage
         $headline = esc_html((string) $s['headline']);
         $message = esc_html((string) $s['message']);
         $badge = esc_html(self::BADGES[(string) $s['modo']] ?? self::BADGES['venta']);
+        $note = sprintf('<p class="bpv-note" data-bpv-show="show_whatsapp" data-bpv-text="whatsapp_note">%s</p>', esc_html((string) $s['whatsapp_note']));
         ?>
         <p class="bpsev-preview__label">Barra superior</p>
         <div class="bpv-bar" data-bpv-theme style="<?php echo $style; ?>">
@@ -247,12 +250,19 @@ final class SettingsPage
             <div class="bpv-actions"><?php echo $buttons; ?></div>
             <button type="button" class="bpv-close" tabindex="-1" aria-label="Cerrar aviso" data-bpv-show="dismissible">&times;</button>
         </div>
+        <?php echo $note; ?>
+        <p class="bpsev-preview__label">Barra en móvil</p>
+        <div class="bpv-bar bpv-bar--mobile" data-bpv-theme style="<?php echo $style; ?>">
+            <p class="bpv-bar__text"><strong data-bpv-text="headline"><?php echo $headline; ?></strong></p>
+            <a class="bpv-btn bpv-btn--wa" href="#" data-bpv-show="show_whatsapp"><span data-bpv-text="cta_whatsapp_short"><?php echo esc_html((string) $s['cta_whatsapp_short']); ?></span></a>
+        </div>
         <p class="bpsev-preview__label">Tarjeta lateral</p>
         <aside class="bpv-card" data-bpv-theme style="<?php echo $style; ?>">
             <span class="bpv-card__badge" data-bpv-text="badge"><?php echo $badge; ?></span>
             <p class="bpv-card__title" data-bpv-text="headline"><?php echo $headline; ?></p>
             <p class="bpv-card__text" data-bpv-text="message"><?php echo $message; ?></p>
             <div class="bpv-actions bpv-actions--stack"><?php echo $buttons; ?></div>
+            <?php echo $note; ?>
         </aside>
         <?php
     }

@@ -6,6 +6,7 @@ namespace BanosPortatiles\Headless\Cli;
 
 use BanosPortatiles\Headless\Cache\ContentChangeListener;
 use BanosPortatiles\Headless\Cache\ResponseCache;
+use BanosPortatiles\Headless\Deploy\ContentVersion;
 use BanosPortatiles\Headless\Deploy\DeployHook;
 use BanosPortatiles\Headless\Deploy\DeployScheduler;
 use BanosPortatiles\Headless\Headless\PreviewLinks;
@@ -100,6 +101,10 @@ final class BpCommand
             return;
         }
 
+        if ($report->total('created') + $report->total('updated') > 0) {
+            // The listener was muted during the import: one new content version for the whole bundle.
+            do_action(ContentVersion::TOUCH, 'import-seed');
+        }
         $this->cache->flush();
         if ($deploy && $report->total('created') + $report->total('updated') > 0) {
             \WP_CLI::log($this->scheduler->schedule('import-seed')

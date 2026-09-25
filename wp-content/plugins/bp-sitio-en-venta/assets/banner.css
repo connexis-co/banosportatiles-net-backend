@@ -68,3 +68,8 @@
 .bpv-card__title { margin: 10px 0 6px; font-size: 17px; font-weight: 700; line-height: 1.3; }
 .bpv-card__text { margin: 0 0 14px; opacity: .92; }
 [data-bpv-show][hidden] { display: none !important; }
+/* WhatsApp only to buy or rent the website: the note next to the button and the short label of the mobile bar. */
+.bpv-note { margin: 6px 0 0; font-size: 12px; line-height: 1.4; opacity: .85; }
+.bpv-card .bpv-note { margin-top: 10px; }
+.bpv-bar--mobile { max-width: 375px; }
+.bpv-bar--mobile .bpv-bar__text { font-size: 13px; }

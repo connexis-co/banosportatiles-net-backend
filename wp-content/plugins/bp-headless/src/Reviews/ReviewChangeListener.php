@@ -6,6 +6,7 @@ namespace BanosPortatiles\Headless\Reviews;
 
 use BanosPortatiles\Headless\Cache\ResponseCache;
 use BanosPortatiles\Headless\Contracts\Hookable;
+use BanosPortatiles\Headless\Deploy\ContentVersion;
 use BanosPortatiles\Headless\Deploy\DeployScheduler;
 use GeminiLabs\SiteReviews\Review;
 
@@ -89,6 +90,8 @@ final class ReviewChangeListener implements Hookable
     {
         $this->dirty = true;
         if ($public) {
+            // A visible review changes the public content (rating, reviews, JSON-LD): new content version.
+            do_action(ContentVersion::TOUCH, $reason);
             $this->scheduler->markDirty($reason, DeployScheduler::REVIEWS_DELAY);
         }
     }

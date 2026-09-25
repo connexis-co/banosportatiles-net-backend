@@ -12,8 +12,8 @@ final class PublicConfig
 {
     public const KEYS = [
         'enabled', 'modo', 'headline', 'message', 'whatsapp_number', 'whatsapp_message', 'show_whatsapp',
-        'cta_whatsapp_label', 'show_secondary', 'secondary_label', 'secondary_url', 'colors', 'placements',
-        'dismissible', 'dismiss_days', 'exclude_paths',
+        'cta_whatsapp_label', 'cta_whatsapp_short', 'whatsapp_note', 'show_secondary', 'secondary_label', 'secondary_url',
+        'colors', 'placements', 'dismissible', 'dismiss_days', 'exclude_paths',
     ];
 
     /**
@@ -22,19 +22,24 @@ final class PublicConfig
      */
     public static function from(array $settings): array
     {
+        $defaults = Defaults::settings();
+        $value = static fn (string $key): mixed => $settings[$key] ?? $defaults[$key] ?? null;
         $config = [];
         foreach (self::KEYS as $key) {
-            $config[$key] = $settings[$key] ?? Defaults::settings()[$key];
+            $config[$key] = $value($key);
         }
-        $config['colors'] = Defaults::colors($config['colors']);
+        $config['colors'] = Defaults::colors($value('colors'));
         // Invariant for every consumer: no number, no WhatsApp button (also before the first save).
-        $config['show_whatsapp'] = (bool) $config['show_whatsapp'] && is_string($config['whatsapp_number']) && $config['whatsapp_number'] !== '';
+        $number = $value('whatsapp_number');
+        $config['show_whatsapp'] = (bool) $value('show_whatsapp') && is_string($number) && $number !== '';
         // Placements are stored as a list; consumers get an explicit object {placement: bool} (same shape as the seed).
-        $enabled = is_array($config['placements']) ? $config['placements'] : [];
-        $config['placements'] = [];
+        $enabled = $value('placements');
+        $enabled = is_array($enabled) ? $enabled : [];
+        $placements = [];
         foreach (array_keys(Defaults::PLACEMENTS) as $placement) {
-            $config['placements'][$placement] = in_array($placement, $enabled, true);
+            $placements[$placement] = in_array($placement, $enabled, true);
         }
+        $config['placements'] = $placements;
         $config['version'] = substr(md5((string) json_encode($config)), 0, 12);
 
         return $config;

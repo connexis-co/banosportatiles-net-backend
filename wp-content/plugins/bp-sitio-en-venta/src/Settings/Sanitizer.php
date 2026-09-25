@@ -24,6 +24,12 @@ final class Sanitizer
 
     public const LABEL_MAX = 40;
 
+    /** Label of the WhatsApp button in the mobile bar. */
+    public const SHORT_LABEL_MAX = 18;
+
+    /** Notice next to the WhatsApp button («Solo para comprar o alquilar este sitio web…»). */
+    public const NOTE_MAX = 140;
+
     /**
      * @param  array<array-key, mixed>  $input
      * @param  array<string, mixed>  $current
@@ -45,7 +51,11 @@ final class Sanitizer
 
         $settings = ['enabled' => $bool('enabled'), 'modo' => $modo];
 
-        foreach (['headline' => self::HEADLINE_MAX, 'message' => self::MESSAGE_MAX, 'cta_whatsapp_label' => self::LABEL_MAX, 'secondary_label' => self::LABEL_MAX] as $key => $max) {
+        $limits = [
+            'headline' => self::HEADLINE_MAX, 'message' => self::MESSAGE_MAX, 'cta_whatsapp_label' => self::LABEL_MAX,
+            'cta_whatsapp_short' => self::SHORT_LABEL_MAX, 'whatsapp_note' => self::NOTE_MAX, 'secondary_label' => self::LABEL_MAX,
+        ];
+        foreach ($limits as $key => $max) {
             $value = $has($key) ? self::text($input[$key]) : ($partial ? (string) $current[$key] : '');
             if (mb_strlen($value) > $max) {
                 $errors[$key] = sprintf('Máximo %d caracteres (tiene %d).', $max, mb_strlen($value));

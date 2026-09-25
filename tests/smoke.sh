@@ -231,6 +231,9 @@ http "atribución inválida no bloquea el lead → 201" 201 -X POST "$API/leads"
 expect_json "ignored lista lo descartado" '.ignored == ["origen","referrer","gclid"]'
 
 section "8. Headless: redirección del front, noindex y previews"
+http "raíz del CMS → 302 al admin" 302 "$BASE/"
+expect_header "Location /wp-admin/" "Location: $BASE/wp-admin/"
+expect_header "sin caché" 'Cache-Control: no-cache, must-revalidate, max-age=0'
 http "front del CMS → 301" 301 "$BASE/cualquier/ruta/?utm_source=x"
 expect_header "Location conserva ruta y query" "Location: $FRONT/cualquier/ruta/?utm_source=x"
 expect_header "X-Robots-Tag en el front" 'X-Robots-Tag: noindex, nofollow'
@@ -263,8 +266,9 @@ expect_no_header "sin Access-Control-Allow-Origin para orígenes ajenos" 'Access
 
 section "9b. Aviso «sitio en venta» (plugin bp-sitio-en-venta)"
 http "GET /bp-venta/v1/config" 200 "$VENTA/config"
-expect_json "forma del objeto (16 claves + version) y tipos" '(keys | length == 17) and (.enabled | type == "boolean") and (.modo | IN("venta","alquiler","venta_o_alquiler")) and (.colors | keys) == ["accent","accent_text","bg","text","whatsapp_bg","whatsapp_text"] and (.placements | type == "object") and (.dismiss_days | type == "number") and (.version | test("^[0-9a-f]{12}$"))'
+expect_json "forma del objeto (18 claves + version) y tipos" '(keys | length == 19) and (.enabled | type == "boolean") and (.modo | IN("venta","alquiler","venta_o_alquiler")) and (.colors | keys) == ["accent","accent_text","bg","text","whatsapp_bg","whatsapp_text"] and (.placements | type == "object") and (.dismiss_days | type == "number") and (.version | test("^[0-9a-f]{12}$"))'
 expect_json "colores oficiales del botón de WhatsApp por defecto (1.0.3)" '.colors.whatsapp_bg == "#25d366" and .colors.whatsapp_text == "#ffffff"'
+expect_json "texto corto (≤ 18) y aviso del WhatsApp (≤ 140) (1.0.4)" '(.cta_whatsapp_short | length) > 0 and (.cta_whatsapp_short | length) <= 18 and (.whatsapp_note | length) > 0 and (.whatsapp_note | length) <= 140'
 expect_header "Cache-Control público" 'Cache-Control: public, max-age=60'
 venta_etag="$(grep -i '^ETag:' "$TMP/headers" | cut -d' ' -f2 | tr -d '\r')"
 http "config con If-None-Match → 304" 304 -H "If-None-Match: $venta_etag" "$VENTA/config"
@@ -284,7 +288,7 @@ $_POST = $_REQUEST = ["_wpnonce" => wp_create_nonce("bp_sitio_en_venta_save"), "
   "placements" => ["top_bar"], "dismissible" => "1", "dismiss_days" => "5", "exclude_paths" => "/cotizar/"]];
 (new BanosPortatiles\SitioEnVenta\Admin\SettingsPage(BanosPortatiles\SitioEnVenta\Plugin::store()))->save();' >/dev/null
 http "config tras «Guardar y publicar» desde el admin" 200 "$VENTA/config"
-expect_json "cambios visibles al instante (caché invalidada) y E.164 normalizado" '.headline == "Titular de prueba smoke" and .whatsapp_number == "+573000000000" and .show_whatsapp == true and .dismiss_days == 5 and .placements.top_bar == true and ([.placements[]] | map(select(.)) | length == 1) and (.message | startswith("Dominio")) and .colors.whatsapp_bg == "#128c7e"'
+expect_json "cambios visibles al instante (caché invalidada), E.164 normalizado y textos por defecto del modo" '.headline == "Titular de prueba smoke" and .whatsapp_number == "+573000000000" and .show_whatsapp == true and .dismiss_days == 5 and .placements.top_bar == true and ([.placements[]] | map(select(.)) | length == 1) and (.message | startswith("¿Tienes una empresa")) and (.whatsapp_note | startswith("Solo para comprar")) and .cta_whatsapp_short == "Comprar sitio" and .colors.whatsapp_bg == "#128c7e"'
 [[ "$(jq -r .version "$TMP/body")" != "$(jq -r .version "$TMP/venta.json")" ]] && ok "version cambia (el front reinicia los avisos cerrados)" || ko "version sin cambios"
 [[ "$(curl -s "$API/site" | jq -r '.sale_banner.headline')" == "Titular de prueba smoke" ]] && ok "/site → sale_banner actualizado (caché de bp-headless invalidada)" || ko "/site → sale_banner desactualizado"
 [[ "$(wp transient get bp_sitio_en_venta_notice_1 --format=json | jq -r '.published')" == "scheduled" ]] && ok "«Guardar y publicar» programó el deploy vía bp-headless" || ko "publicación no programada"
@@ -294,13 +298,25 @@ wp eval 'BanosPortatiles\SitioEnVenta\Plugin::store()->import(json_decode((strin
 
 section "10. Deploy hook (debounce 60 s con WP-Cron)"
 docker compose exec -T hook-sink sh -c ': > /sink/requests.log' >/dev/null 2>&1
+version_before="$(curl -s "$API/status" | jq -r .contentVersion)"
 wp post update "$cali_id" --post_excerpt='Alquiler de baños portátiles en Cali y municipios cercanos.' >/dev/null
 scheduled="$(wp cron event list --hook=bp_headless_deploy --format=count)"
 [[ "$scheduled" == "1" ]] && ok "publicar programa un único deploy (debounce)" || ko "deploy programado ($scheduled)"
+http "GET /status" 200 "$API/status"
+expect_header "status sin caché" 'Cache-Control: no-store'
+expect_json "nueva contentVersion, lastChangeAt y estado «programado» con cuenta regresiva" ".contentVersion != \"$version_before\" and (.lastChangeAt | test(\"^\\\\d{4}-\")) and .publish.state == \"scheduled\" and .publish.poll == true and (.deploy.scheduledFor | type == \"string\") and (.publish.until | type == \"string\")"
+[[ "$(curl -s "$API/site" | jq -r .contentVersion)" == "$(jq -r .contentVersion "$TMP/body")" ]] && ok "/site → contentVersion igual a /status" || ko "/site → contentVersion"
 wp cron event run bp_headless_deploy >/dev/null
 if docker compose exec -T hook-sink cat /sink/requests.log 2>/dev/null | grep '"path":"/deploy"' | grep -q 'bp-headless'; then ok "POST al deploy hook recibido"; else ko "POST al deploy hook"; fi
 last_ok="$(wp option get bp_headless_deploy_last --format=json | jq -r '.ok')"
 [[ "$last_ok" == "true" ]] && ok "último disparo registrado como OK (widget del dashboard)" || ko "registro del último disparo"
+http "GET /status tras el disparo" 200 "$API/status"
+expect_json "«publicando»: hook 2xx y build.json sin la versión nueva, con progreso estimado" '.publish.state == "publishing" and .deploy.lastTriggerStatus == "ok" and .deploy.lastTriggerHttp == 200 and (.publish.progress | type == "number") and .publish.estimateSeconds == 180 and (.deploy | has("scheduledFor") | not)'
+current_version="$(jq -r .contentVersion "$TMP/body")"
+wp eval "set_transient('bp_headless_build_info', ['build' => ['version' => '$current_version', 'builtAt' => time(), 'commit' => 'abc1234']], 20);" >/dev/null
+http "GET /status con build.json al día" 200 "$API/status"
+expect_json "«publicado» cuando build.json tiene la contentVersion actual" ".publish.state == \"published\" and .publish.poll == false and .build.contentVersion == \"$current_version\" and .build.commit == \"abc1234\""
+wp transient delete bp_headless_build_info >/dev/null
 
 section "11. Valoraciones, reseñas, precios, TOC y SEO (Site Reviews + Rank Math)"
 for plugin in site-reviews seo-by-rank-math safe-svg; do
@@ -359,6 +375,7 @@ post_signed "POST /ratings inválido → 422" 422 /ratings "{\"uri\":\"$service_
 expect_json "errors por campo" '.errors | has("rating") and has("voter") and has("ip")'
 post_signed "POST /ratings en la home → 403" 403 /ratings "{\"uri\":\"/\",\"rating\":5,\"voter\":\"$VOTER_A\",\"ip\":\"$SMOKE_IP\"}"
 wp cron event delete bp_headless_deploy >/dev/null
+vote_version="$(curl -s "$API/status" | jq -r .contentVersion)"
 post_signed "POST /ratings voto → 201" 201 /ratings "$VOTE"
 expect_json "created y resumen con el voto" '.ok == true and .created == true and .summary.count >= 1 and .summary.uri == "'"$service_uri"'"'
 post_signed "POST /ratings mismo votante → 200 duplicado" 200 /ratings "${VOTE/\"rating\":5/\"rating\":3}"
@@ -367,6 +384,7 @@ expect_json "duplicate sin segundo voto" '.created == false and .duplicate == tr
 vote_id="$(wp post list --post_type=site-review --post_status=any --meta_key=_bp_voter --meta_value="$VOTER_A" --field=ID | head -1)"
 [[ "$(wp post term list "$vote_id" site-review-category --field=slug)" == "calificacion" && "$(wp post get "$vote_id" --field=post_status)" == "publish" ]] && ok "voto aprobado con la categoría «Calificación»" || ko "categoría/estado del voto"
 [[ "$(wp cron event list --hook=bp_headless_deploy --format=count)" == "1" ]] && ok "el voto aprobado pide un deploy (ventana de 15 min)" || ko "deploy tras el voto"
+[[ "$(curl -s "$API/status" | jq -r .contentVersion)" != "$vote_version" ]] && ok "el voto aprobado cambia la contentVersion" || ko "contentVersion tras el voto"
 curl -s "$API/ratings?uri=$service_uri" > "$TMP/body"
 expect_json "GET /ratings?uri= refleja el voto (caché invalidada)" '.count >= 1 and .distribution["5"] >= 1'
 

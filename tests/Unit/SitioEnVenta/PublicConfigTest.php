@@ -11,6 +11,8 @@ it('exposes a stable REST shape with typed values', function (): void {
     expect(array_keys($config))->toBe([...PublicConfig::KEYS, 'version'])
         ->and($config['enabled'])->toBeBool()
         ->and($config['modo'])->toBe('venta')
+        ->and($config['cta_whatsapp_short'])->toBe('Comprar sitio')
+        ->and($config['whatsapp_note'])->toBe('Solo para comprar este sitio web. Para cotizar baños portátiles usa el formulario.')
         ->and($config['whatsapp_number'])->toBeString()
         ->and(array_keys($config['colors']))->toBe(['bg', 'text', 'accent', 'accent_text', 'whatsapp_bg', 'whatsapp_text'])
         ->and($config['colors']['whatsapp_bg'])->toBe('#25d366')
