@@ -266,8 +266,9 @@ expect_no_header "sin Access-Control-Allow-Origin para orígenes ajenos" 'Access
 
 section "9b. Aviso «sitio en venta» (plugin bp-sitio-en-venta)"
 http "GET /bp-venta/v1/config" 200 "$VENTA/config"
-expect_json "forma del objeto (16 claves + version) y tipos" '(keys | length == 17) and (.enabled | type == "boolean") and (.modo | IN("venta","alquiler","venta_o_alquiler")) and (.colors | keys) == ["accent","accent_text","bg","text","whatsapp_bg","whatsapp_text"] and (.placements | type == "object") and (.dismiss_days | type == "number") and (.version | test("^[0-9a-f]{12}$"))'
+expect_json "forma del objeto (18 claves + version) y tipos" '(keys | length == 19) and (.enabled | type == "boolean") and (.modo | IN("venta","alquiler","venta_o_alquiler")) and (.colors | keys) == ["accent","accent_text","bg","text","whatsapp_bg","whatsapp_text"] and (.placements | type == "object") and (.dismiss_days | type == "number") and (.version | test("^[0-9a-f]{12}$"))'
 expect_json "colores oficiales del botón de WhatsApp por defecto (1.0.3)" '.colors.whatsapp_bg == "#25d366" and .colors.whatsapp_text == "#ffffff"'
+expect_json "texto corto (≤ 18) y aviso del WhatsApp (≤ 140) (1.0.4)" '(.cta_whatsapp_short | length) > 0 and (.cta_whatsapp_short | length) <= 18 and (.whatsapp_note | length) > 0 and (.whatsapp_note | length) <= 140'
 expect_header "Cache-Control público" 'Cache-Control: public, max-age=60'
 venta_etag="$(grep -i '^ETag:' "$TMP/headers" | cut -d' ' -f2 | tr -d '\r')"
 http "config con If-None-Match → 304" 304 -H "If-None-Match: $venta_etag" "$VENTA/config"

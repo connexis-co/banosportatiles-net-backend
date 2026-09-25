@@ -33,7 +33,7 @@
   });
 
   // --- Text → preview ------------------------------------------------------------------------------------
-  const texts = ['headline', 'message', 'cta_whatsapp_label', 'secondary_label'];
+  const texts = ['headline', 'message', 'cta_whatsapp_label', 'cta_whatsapp_short', 'whatsapp_note', 'secondary_label'];
   const renderTexts = () => {
     texts.forEach((key) => {
       const field = input(key);

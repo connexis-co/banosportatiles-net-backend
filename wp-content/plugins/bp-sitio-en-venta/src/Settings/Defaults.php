@@ -62,31 +62,40 @@ final class Defaults
     public const SECONDARY_URL = '/sitio-en-venta/';
 
     /**
-     * @return array{headline: string, message: string, whatsapp_message: string, cta_whatsapp_label: string, secondary_label: string}
+     * Suggested texts of each mode. Explicit on purpose: the WhatsApp of the notice is ONLY to buy or rent the
+     * website, never to ask for a quote of portable toilets (that goes through the site's form).
+     *
+     * @return array{headline: string, message: string, whatsapp_message: string, cta_whatsapp_label: string, cta_whatsapp_short: string, whatsapp_note: string, secondary_label: string}
      */
     public static function texts(string $modo): array
     {
         return match ($modo) {
             'alquiler' => [
                 'headline' => 'Este sitio web está disponible para alquiler',
-                'message' => 'Recibe en tu empresa las solicitudes de cotización que llegan a este sitio. Pregunta por las condiciones del alquiler.',
-                'whatsapp_message' => 'Hola, me interesa alquilar el sitio {sitio} ({url}). ¿Cuáles son las condiciones?',
-                'cta_whatsapp_label' => 'Consultar por WhatsApp',
-                'secondary_label' => 'Ver condiciones',
+                'message' => '¿Tienes una empresa de baños portátiles o saneamiento? Arrienda este sitio web: dominio, contenido y posicionamiento. El WhatsApp es solo para negociar el sitio.',
+                'whatsapp_message' => 'Hola, me interesa alquilar el sitio web {sitio} (dominio, contenido y posicionamiento). No es para cotizar baños portátiles. Lo vi en {url}',
+                'cta_whatsapp_label' => 'WhatsApp: alquilar este sitio',
+                'cta_whatsapp_short' => 'Alquilar sitio',
+                'whatsapp_note' => 'Solo para alquilar este sitio web. Para cotizar baños portátiles usa el formulario.',
+                'secondary_label' => 'Ver condiciones del alquiler',
             ],
             'venta_o_alquiler' => [
                 'headline' => 'Este sitio web está en venta o alquiler',
-                'message' => 'Dominio, contenido y posicionamiento en el nicho de baños portátiles en Colombia, disponibles para compra o alquiler. Hablemos de la opción que más le sirve a tu empresa.',
-                'whatsapp_message' => 'Hola, me interesa el sitio {sitio} ({url}). ¿Qué opciones de compra o alquiler tienen?',
-                'cta_whatsapp_label' => 'Consultar por WhatsApp',
-                'secondary_label' => 'Ver detalles',
+                'message' => '¿Tienes una empresa de baños portátiles o saneamiento? Compra o arrienda este sitio web: dominio, contenido y posicionamiento. El WhatsApp es solo para negociar el sitio.',
+                'whatsapp_message' => 'Hola, me interesa comprar o alquilar el sitio web {sitio} (dominio, contenido y posicionamiento). No es para cotizar baños portátiles. Lo vi en {url}',
+                'cta_whatsapp_label' => 'WhatsApp: comprar este sitio',
+                'cta_whatsapp_short' => 'Comprar sitio',
+                'whatsapp_note' => 'Solo para comprar o alquilar este sitio web. Para cotizar baños portátiles usa el formulario.',
+                'secondary_label' => 'Ver detalles de la venta',
             ],
             default => [
                 'headline' => 'Este sitio web está en venta',
-                'message' => 'Dominio, contenido y posicionamiento en el nicho de baños portátiles en Colombia. Si tu empresa quiere quedarse con este canal de clientes, hablemos.',
-                'whatsapp_message' => 'Hola, me interesa comprar el sitio {sitio} ({url}). ¿Me compartes más información?',
-                'cta_whatsapp_label' => 'Consultar por WhatsApp',
-                'secondary_label' => 'Ver detalles',
+                'message' => '¿Tienes una empresa de baños portátiles o saneamiento? Compra este sitio web: dominio, contenido y posicionamiento. El WhatsApp es solo para negociar el sitio.',
+                'whatsapp_message' => 'Hola, me interesa comprar el sitio web {sitio} (dominio, contenido y posicionamiento). No es para cotizar baños portátiles. Lo vi en {url}',
+                'cta_whatsapp_label' => 'WhatsApp: comprar este sitio',
+                'cta_whatsapp_short' => 'Comprar sitio',
+                'whatsapp_note' => 'Solo para comprar este sitio web. Para cotizar baños portátiles usa el formulario.',
+                'secondary_label' => 'Ver detalles de la venta',
             ],
         };
     }
@@ -108,6 +117,8 @@ final class Defaults
             'whatsapp_message' => $texts['whatsapp_message'],
             'show_whatsapp' => true,
             'cta_whatsapp_label' => $texts['cta_whatsapp_label'],
+            'cta_whatsapp_short' => $texts['cta_whatsapp_short'],
+            'whatsapp_note' => $texts['whatsapp_note'],
             'show_secondary' => true,
             'secondary_label' => $texts['secondary_label'],
             'secondary_url' => self::SECONDARY_URL,

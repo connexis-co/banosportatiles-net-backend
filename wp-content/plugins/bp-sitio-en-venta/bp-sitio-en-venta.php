@@ -3,7 +3,7 @@
 /**
  * Plugin Name:       Sitio en venta
  * Description:       Aviso configurable de «sitio en venta / alquiler» (barras, tarjeta lateral, bloque) con WhatsApp, vista previa en vivo y API REST bp-venta/v1. Independiente y portable: no requiere otros plugins.
- * Version:           1.0.3
+ * Version:           1.0.4
  * Requires at least: 6.5
  * Requires PHP:      8.3
  * Author:            Connexis
@@ -20,7 +20,7 @@ if (! defined('ABSPATH')) {
     exit;
 }
 
-const VERSION = '1.0.3';
+const VERSION = '1.0.4';
 const PLUGIN_FILE = __FILE__;
 
 if (PHP_VERSION_ID < 80300) {
