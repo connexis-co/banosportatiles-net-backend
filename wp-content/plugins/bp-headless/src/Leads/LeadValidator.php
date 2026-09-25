@@ -126,10 +126,13 @@ final class LeadValidator
         return in_array($key, self::CLICK_IDS, true) ? $key : 'utm_'.$key;
     }
 
-    /** CTA location: lowercase letters and "_" (hero, header_movil, pagina_cotizar…), max. 40. */
+    /**
+     * CTA location (hero, header_movil, pagina_cotizar…), max. 40: lowercase letters and "_", plus digits and
+     * "-" like sanitizeOrigen() of the front.
+     */
     public static function origen(string $value): ?string
     {
-        return preg_match('/^[a-z_]{1,'.self::MAX_ORIGEN.'}$/', $value) === 1 ? $value : null;
+        return preg_match('/^[a-z0-9_-]{1,'.self::MAX_ORIGEN.'}$/', $value) === 1 ? $value : null;
     }
 
     /** Relative URI of the site ("/…"; with $query, "?…" is allowed too). */

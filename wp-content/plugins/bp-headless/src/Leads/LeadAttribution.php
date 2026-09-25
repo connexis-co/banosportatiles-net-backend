@@ -20,8 +20,14 @@ final class LeadAttribution
         'card' => 'Tarjeta',
         'mega' => 'Mega-menú',
         'cuerpo' => 'Cuerpo del contenido',
+        'precio' => 'Bloque de precio',
+        'modal' => 'Ventana de cotización',
+        'hero_formulario' => 'Formulario del hero',
         'pagina_cotizar' => 'Página /cotizar/',
+        'cotizar' => 'Página /cotizar/',
         'pagina_contacto' => 'Página /contacto/',
+        'contacto' => 'Página /contacto/',
+        'venta_sitio' => 'Aviso de sitio en venta',
     ];
 
     /** Order and labels of the stored attribution (lead detail and email). */
