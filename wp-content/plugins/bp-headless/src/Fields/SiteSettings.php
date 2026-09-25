@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace BanosPortatiles\Headless\Fields;
 
 use BanosPortatiles\Headless\Config;
+use BanosPortatiles\Headless\Leads\QuoteCta;
 use BanosPortatiles\Headless\Normalizer\TocResolver;
 use BanosPortatiles\Headless\Reviews\RatingPolicy;
 use BanosPortatiles\Headless\Reviews\RatingSettings;
@@ -103,6 +104,20 @@ final class SiteSettings
                 $a->text('gtm', 'Google Tag Manager (GTM-…)'),
             ]),
             $f->group('forms', 'Formularios', static fn (FieldBuilder $fo): array => [
+                $fo->select('cta_mode', 'Botones «Solicitar cotización»', QuoteCta::MODES, [
+                    'default_value' => QuoteCta::DEFAULT_MODE,
+                    'instructions' => 'Para todo el sitio; cada página puede cambiarlo en su caja «Cotización». /cotizar/ y /contacto/ siempre muestran su propio formulario.',
+                ]),
+                $fo->group('modal', 'Textos del formulario de cotización', static fn (FieldBuilder $m): array => [
+                    $m->text('eyebrow', 'Antetítulo', ['placeholder' => QuoteCta::MODAL_DEFAULTS['eyebrow']]),
+                    $m->text('title', 'Título', ['placeholder' => QuoteCta::MODAL_DEFAULTS['title']]),
+                    $m->textarea('subtitle', 'Subtítulo', ['rows' => 2, 'placeholder' => QuoteCta::MODAL_DEFAULTS['subtitle']]),
+                    $m->textarea('success', 'Mensaje al enviar', ['rows' => 2, 'placeholder' => QuoteCta::MODAL_DEFAULTS['success']]),
+                ], ['instructions' => 'Ventana (modal) y tarjeta del formulario. Vacío = el texto de ejemplo.']),
+                $fo->group('whatsapp', 'Botón de WhatsApp de los formularios', static fn (FieldBuilder $w): array => [
+                    $w->field('color_picker', 'bg', 'Fondo', ['default_value' => QuoteCta::WHATSAPP_DEFAULTS['bg']]),
+                    $w->field('color_picker', 'text', 'Texto', ['default_value' => QuoteCta::WHATSAPP_DEFAULTS['text']]),
+                ], ['layout' => 'row', 'instructions' => 'Por defecto, los colores oficiales de WhatsApp. Blanco sobre #25D366 tiene contraste 1,98:1: no cumple WCAG AA para texto (4,5:1); un texto oscuro (#052e16) sí.']),
                 $fo->text('turnstile_site_key', 'Cloudflare Turnstile — site key (pública)'),
                 $fo->email('leads_email', 'Email que recibe los leads', ['instructions' => 'Vacío = contacto@banosportatiles.net. La constante BP_LEADS_EMAIL_TO (wp-config) tiene prioridad; las copias van en BP_LEADS_EMAIL_CC.']),
                 $fo->url('leads_webhook_url', 'Webhook de leads (opcional)', ['instructions' => 'n8n, Make, CRM… Recibe un POST firmado (HMAC) por cada lead.']),
