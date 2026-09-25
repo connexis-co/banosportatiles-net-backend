@@ -144,7 +144,7 @@ it('resolves node.lead: chosen service, automatic service on service pages, mode
         7 => ['lead' => ['service' => 99, 'mode' => 'inherit', 'title' => '']],
         9 => ['lead' => ['service' => 11, 'mode' => 'modal', 'title' => 'Obsoleto']],
     ]);
-    $service = new WP_Post(['ID' => 11, 'post_type' => 'page', 'post_name' => 'alquiler-de-banos-portatiles', 'post_title' => 'Alquiler de baños portátiles']);
+    $service = new WP_Post(['ID' => 11, 'post_type' => 'page', 'post_name' => 'alquiler-de-banos-portatiles', 'post_title' => 'Alquiler de baños portátiles: eventos, obras y fincas']);
     $notService = new WP_Post(['ID' => 99, 'post_type' => 'page', 'post_name' => 'nosotros', 'post_title' => 'Nosotros']);
     Functions\when('get_post')->alias(static fn (mixed $post): mixed => $post instanceof WP_Post ? $post : [11 => $service, 99 => $notService][(int) $post] ?? null);
 

@@ -83,8 +83,9 @@ final class QuoteCta
 
     /**
      * node.lead. $local: the «Cotización» group (null when the template has none). $self: {label, uri} of the
-     * node itself. $chosen: {label, uri} of the service picked in the group, when it is a published service page.
-     * Service: the chosen one, else the node itself on hub-servicio/servicio, else none (the visitor picks it).
+     * node itself (label = serviceLabel() of its title). $chosen: {label, uri} of the service picked in the
+     * group, when it is a published service page. Service: the chosen one, else the node itself on
+     * hub-servicio/servicio, else none (the visitor picks it).
      *
      * @param  array{label: string, uri: string}  $self
      * @param  array{label: string, uri: string}|null  $chosen
@@ -99,6 +100,19 @@ final class QuoteCta
         return ($service !== null ? ['service' => $service] : [])
             + ['mode' => self::mode(Arr::string($local, 'mode')) ?? self::mode($siteMode) ?? self::DEFAULT_MODE]
             + ($title !== '' ? ['title' => $title] : []);
+    }
+
+    /**
+     * Short name of a service for the select and the modal title: the page title without its complement
+     * («Biodigestores: precios, tipos e instalación» → «Biodigestores»). Same rule as serviceLabel() of the front
+     * (frontend/src/lib/leads/context.ts), so the lead's "servicio" matches.
+     */
+    public static function serviceLabel(string $title): string
+    {
+        $title = trim($title);
+        $short = trim((preg_split('/\s*(?::|\s[|–—]\s)\s*/u', $title) ?: [''])[0]);
+
+        return mb_strlen($short) >= 3 ? $short : $title;
     }
 
     /** "modal" | "page" (also "pagina"/"página" from the seed); null for "inherit" or anything else. */

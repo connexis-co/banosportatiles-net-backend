@@ -41,6 +41,17 @@ it('resolves node.lead from the page group, the template and the site mode', fun
         ->and(QuoteCta::resolve('modal', ['mode' => 'page'], 'equipo', $self, null))->toBe(['mode' => 'page']);
 });
 
+it('shortens the service label like the front (title without its complement)', function (string $title, string $label): void {
+    expect(QuoteCta::serviceLabel($title))->toBe($label);
+})->with([
+    ['Biodigestores: precios, tipos e instalación', 'Biodigestores'],
+    ['Pozos sépticos: tipos, precios, instalación y limpieza', 'Pozos sépticos'],
+    ['Alquiler de baños portátiles | Eventos y obras', 'Alquiler de baños portátiles'],
+    ['Servicio de vactor — succión y transporte', 'Servicio de vactor'],
+    ['Baños portátiles para eventos', 'Baños portátiles para eventos'],
+    ['Wi: algo', 'Wi: algo'],
+]);
+
 it('accepts the seed spellings of the mode and normalizes colors', function (): void {
     expect(QuoteCta::mode('Página'))->toBe('page')
         ->and(QuoteCta::mode('pagina'))->toBe('page')

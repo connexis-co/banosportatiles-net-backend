@@ -110,6 +110,7 @@ it('names the acquisition channel and the CTA location', function (): void {
         ->and(LeadAttribution::channel([]))->toBe('Directo')
         ->and(LeadAttribution::summary(['origen' => 'header_movil', 'gclid' => 'x']))->toBe('Cabecera en el móvil · Google Ads')
         ->and(LeadAttribution::summary(['origen' => 'nuevo_boton']))->toBe('nuevo_boton · Directo')
+        ->and(LeadAttribution::summary(['origen' => 'menu_movil', 'utm_source' => 'newsletter']))->toBe('Menú del móvil · newsletter')
         ->and(LeadAttribution::summary([]))->toBe('— · Directo');
 });
 
@@ -175,4 +176,24 @@ it('stores one meta per attribution field and reads old leads from their "utm" J
     $meta[7] = ['_bp_lead_utm' => '{"source":"google","medium":"cpc","gclid":"abc"}'];
     expect(BanosPortatiles\Headless\Leads\LeadRepository::attribution(7))->toBe(['utm_source' => 'google', 'utm_medium' => 'cpc', 'gclid' => 'abc'])
         ->and(BanosPortatiles\Headless\Leads\LeadRepository::attribution(8))->toBe([]);
+});
+
+it('reads the final front payload: origen, URIs and referrer at the top level, click ids inside "utm"', function (): void {
+    $result = (new LeadValidator)->validate([
+        'nombre' => 'Ana', 'telefono' => '3001234567', 'consentimiento' => true, 'consentimiento_comercial' => true,
+        'servicio' => 'Biodigestores',
+        'origen' => 'menu_movil',
+        'servicio_uri' => '/biodigestores/',
+        'landing' => '/biodigestores/',
+        'referrer' => 'https://l.facebook.com/',
+        'utm' => ['source' => 'facebook', 'medium' => 'paid', 'campaign' => 'bio', 'fbclid' => 'IwAR2abc', 'gclid' => 'Cj0K-x_1'],
+    ]);
+
+    expect($result->ignored)->toBe([])
+        ->and($result->lead?->servicio)->toBe('Biodigestores')
+        ->and($result->lead?->consentimientoComercial)->toBeTrue()
+        ->and($result->lead?->attribution())->toBe([
+            'origen' => 'menu_movil', 'servicio_uri' => '/biodigestores/', 'referrer' => 'https://l.facebook.com/', 'landing' => '/biodigestores/',
+            'utm_source' => 'facebook', 'utm_medium' => 'paid', 'utm_campaign' => 'bio', 'gclid' => 'Cj0K-x_1', 'fbclid' => 'IwAR2abc',
+        ]);
 });

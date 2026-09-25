@@ -132,7 +132,7 @@ final class NodeNormalizer
         $local = QuoteCta::supports($template) ? $this->fields->get('lead', $post->ID) : null;
         $chosen = is_array($local) ? $this->service($local['service'] ?? null, $post->ID) : null;
 
-        return QuoteCta::resolve($this->ctaMode(), $local, $template, ['label' => $title, 'uri' => $uri], $chosen);
+        return QuoteCta::resolve($this->ctaMode(), $local, $template, ['label' => QuoteCta::serviceLabel($title), 'uri' => $uri], $chosen);
     }
 
     /**
@@ -150,7 +150,7 @@ final class NodeNormalizer
         }
         $uri = $this->uris->forPost($service);
 
-        return $uri !== null ? ['label' => self::decode($service->post_title), 'uri' => $uri] : null;
+        return $uri !== null ? ['label' => QuoteCta::serviceLabel(self::decode($service->post_title)), 'uri' => $uri] : null;
     }
 
     /** «Ajustes del sitio → Formularios → Botones», read once per request. */
