@@ -1,0 +1,30 @@
+/* Publication state (bp-headless): admin bar item and dashboard widget. Updated by publish-status.js. */
+.bp-publish { display: inline-flex; align-items: center; gap: 7px; position: relative; }
+.bp-publish__dot { width: 9px; height: 9px; border-radius: 50%; flex: none; box-shadow: 0 0 0 2px rgba(255, 255, 255, .15); }
+.bp-publish--scheduled .bp-publish__dot,
+.bp-publish--publishing .bp-publish__dot { animation: bp-publish-pulse 1.4s ease-in-out infinite; }
+.bp-publish__bar { display: none; }
+.bp-publish--publishing .bp-publish__bar { display: block; }
+.bp-publish__bar > span { display: block; height: 100%; background: #72aee6; transition: width 1s linear; }
+
+#wpadminbar .bp-publish-node > .ab-item { position: relative; }
+#wpadminbar .bp-publish--compact .bp-publish__bar { position: absolute; left: -10px; right: -10px; bottom: -6px; height: 3px; background: rgba(255, 255, 255, .12); }
+#wpadminbar #wp-admin-bar-bp-publish-now > .ab-item { font-weight: 600; }
+
+.bp-publish-widget { margin: 0 0 12px; padding: 12px 14px; border: 1px solid #dcdcde; border-radius: 6px; background: #f6f7f7; font-size: 14px; font-weight: 600; }
+.bp-publish-widget .bp-publish { display: flex; flex-wrap: wrap; }
+.bp-publish-widget .bp-publish__dot { width: 11px; height: 11px; box-shadow: none; }
+.bp-publish-widget .bp-publish__bar { flex-basis: 100%; height: 6px; margin-top: 8px; border-radius: 3px; background: #dcdcde; overflow: hidden; }
+.bp-publish-widget .bp-publish__bar > span { background: #2271b1; }
+
+@keyframes bp-publish-pulse { 50% { opacity: .35; } }
+@media (prefers-reduced-motion: reduce) {
+  .bp-publish__dot { animation: none !important; }
+  .bp-publish__bar > span { transition: none; }
+}
+@media screen and (max-width: 782px) {
+  #wpadminbar #wp-admin-bar-bp-publish { display: block; }
+  #wpadminbar #wp-admin-bar-bp-publish > .ab-item { padding: 0 8px; }
+  #wpadminbar .bp-publish--compact .bp-publish__text { display: none; }
+  #wpadminbar .bp-publish--compact .bp-publish__dot { width: 14px; height: 14px; margin-top: 16px; }
+}

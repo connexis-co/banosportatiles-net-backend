@@ -297,13 +297,25 @@ wp eval 'BanosPortatiles\SitioEnVenta\Plugin::store()->import(json_decode((strin
 
 section "10. Deploy hook (debounce 60 s con WP-Cron)"
 docker compose exec -T hook-sink sh -c ': > /sink/requests.log' >/dev/null 2>&1
+version_before="$(curl -s "$API/status" | jq -r .contentVersion)"
 wp post update "$cali_id" --post_excerpt='Alquiler de baños portátiles en Cali y municipios cercanos.' >/dev/null
 scheduled="$(wp cron event list --hook=bp_headless_deploy --format=count)"
 [[ "$scheduled" == "1" ]] && ok "publicar programa un único deploy (debounce)" || ko "deploy programado ($scheduled)"
+http "GET /status" 200 "$API/status"
+expect_header "status sin caché" 'Cache-Control: no-store'
+expect_json "nueva contentVersion, lastChangeAt y estado «programado» con cuenta regresiva" ".contentVersion != \"$version_before\" and (.lastChangeAt | test(\"^\\\\d{4}-\")) and .publish.state == \"scheduled\" and .publish.poll == true and (.deploy.scheduledFor | type == \"string\") and (.publish.until | type == \"string\")"
+[[ "$(curl -s "$API/site" | jq -r .contentVersion)" == "$(jq -r .contentVersion "$TMP/body")" ]] && ok "/site → contentVersion igual a /status" || ko "/site → contentVersion"
 wp cron event run bp_headless_deploy >/dev/null
 if docker compose exec -T hook-sink cat /sink/requests.log 2>/dev/null | grep '"path":"/deploy"' | grep -q 'bp-headless'; then ok "POST al deploy hook recibido"; else ko "POST al deploy hook"; fi
 last_ok="$(wp option get bp_headless_deploy_last --format=json | jq -r '.ok')"
 [[ "$last_ok" == "true" ]] && ok "último disparo registrado como OK (widget del dashboard)" || ko "registro del último disparo"
+http "GET /status tras el disparo" 200 "$API/status"
+expect_json "«publicando»: hook 2xx y build.json sin la versión nueva, con progreso estimado" '.publish.state == "publishing" and .deploy.lastTriggerStatus == "ok" and .deploy.lastTriggerHttp == 200 and (.publish.progress | type == "number") and .publish.estimateSeconds == 180 and (.deploy | has("scheduledFor") | not)'
+current_version="$(jq -r .contentVersion "$TMP/body")"
+wp eval "set_transient('bp_headless_build_info', ['build' => ['version' => '$current_version', 'builtAt' => time(), 'commit' => 'abc1234']], 20);" >/dev/null
+http "GET /status con build.json al día" 200 "$API/status"
+expect_json "«publicado» cuando build.json tiene la contentVersion actual" ".publish.state == \"published\" and .publish.poll == false and .build.contentVersion == \"$current_version\" and .build.commit == \"abc1234\""
+wp transient delete bp_headless_build_info >/dev/null
 
 section "11. Valoraciones, reseñas, precios, TOC y SEO (Site Reviews + Rank Math)"
 for plugin in site-reviews seo-by-rank-math safe-svg; do
@@ -362,6 +374,7 @@ post_signed "POST /ratings inválido → 422" 422 /ratings "{\"uri\":\"$service_
 expect_json "errors por campo" '.errors | has("rating") and has("voter") and has("ip")'
 post_signed "POST /ratings en la home → 403" 403 /ratings "{\"uri\":\"/\",\"rating\":5,\"voter\":\"$VOTER_A\",\"ip\":\"$SMOKE_IP\"}"
 wp cron event delete bp_headless_deploy >/dev/null
+vote_version="$(curl -s "$API/status" | jq -r .contentVersion)"
 post_signed "POST /ratings voto → 201" 201 /ratings "$VOTE"
 expect_json "created y resumen con el voto" '.ok == true and .created == true and .summary.count >= 1 and .summary.uri == "'"$service_uri"'"'
 post_signed "POST /ratings mismo votante → 200 duplicado" 200 /ratings "${VOTE/\"rating\":5/\"rating\":3}"
@@ -370,6 +383,7 @@ expect_json "duplicate sin segundo voto" '.created == false and .duplicate == tr
 vote_id="$(wp post list --post_type=site-review --post_status=any --meta_key=_bp_voter --meta_value="$VOTER_A" --field=ID | head -1)"
 [[ "$(wp post term list "$vote_id" site-review-category --field=slug)" == "calificacion" && "$(wp post get "$vote_id" --field=post_status)" == "publish" ]] && ok "voto aprobado con la categoría «Calificación»" || ko "categoría/estado del voto"
 [[ "$(wp cron event list --hook=bp_headless_deploy --format=count)" == "1" ]] && ok "el voto aprobado pide un deploy (ventana de 15 min)" || ko "deploy tras el voto"
+[[ "$(curl -s "$API/status" | jq -r .contentVersion)" != "$vote_version" ]] && ok "el voto aprobado cambia la contentVersion" || ko "contentVersion tras el voto"
 curl -s "$API/ratings?uri=$service_uri" > "$TMP/body"
 expect_json "GET /ratings?uri= refleja el voto (caché invalidada)" '.count >= 1 and .distribution["5"] >= 1'
 

@@ -14,6 +14,7 @@ use BanosPortatiles\Headless\Rest\Controllers\RedirectsController;
 use BanosPortatiles\Headless\Rest\Controllers\ReviewsController;
 use BanosPortatiles\Headless\Rest\Controllers\RoutesController;
 use BanosPortatiles\Headless\Rest\Controllers\SiteController;
+use BanosPortatiles\Headless\Rest\Controllers\StatusController;
 
 /**
  * Registers the bp/v1 namespace (contracts: docs/plans/2026-09-22_reestructuracion-headless.md §5 and
@@ -33,6 +34,7 @@ final class RestApi implements Hookable
         private readonly LeadsController $leads,
         private readonly RatingsController $ratings,
         private readonly ReviewsController $reviews,
+        private readonly StatusController $status,
     ) {}
 
     public function register(): void
@@ -47,6 +49,12 @@ final class RestApi implements Hookable
         register_rest_route(self::NAMESPACE, '/site', [
             'methods' => \WP_REST_Server::READABLE,
             'callback' => [$this->site, 'handle'],
+            'permission_callback' => $public,
+        ]);
+
+        register_rest_route(self::NAMESPACE, '/status', [
+            'methods' => \WP_REST_Server::READABLE,
+            'callback' => [$this->status, 'handle'],
             'permission_callback' => $public,
         ]);
 

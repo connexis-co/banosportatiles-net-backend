@@ -17,10 +17,13 @@ use BanosPortatiles\Headless\Content\PageTemplates;
 use BanosPortatiles\Headless\Content\PostTypes;
 use BanosPortatiles\Headless\Content\Taxonomies;
 use BanosPortatiles\Headless\Contracts\Hookable;
+use BanosPortatiles\Headless\Deploy\BuildInfo;
+use BanosPortatiles\Headless\Deploy\ContentVersion;
 use BanosPortatiles\Headless\Deploy\DailyRebuild;
 use BanosPortatiles\Headless\Deploy\DeployAdmin;
 use BanosPortatiles\Headless\Deploy\DeployHook;
 use BanosPortatiles\Headless\Deploy\DeployScheduler;
+use BanosPortatiles\Headless\Deploy\PublishMonitor;
 use BanosPortatiles\Headless\Fields\AcfFieldReader;
 use BanosPortatiles\Headless\Fields\FieldRegistrar;
 use BanosPortatiles\Headless\Headless\FrontendRedirect;
@@ -55,6 +58,7 @@ use BanosPortatiles\Headless\Rest\Controllers\RedirectsController;
 use BanosPortatiles\Headless\Rest\Controllers\ReviewsController;
 use BanosPortatiles\Headless\Rest\Controllers\RoutesController;
 use BanosPortatiles\Headless\Rest\Controllers\SiteController;
+use BanosPortatiles\Headless\Rest\Controllers\StatusController;
 use BanosPortatiles\Headless\Rest\Cors;
 use BanosPortatiles\Headless\Rest\HttpCache;
 use BanosPortatiles\Headless\Rest\RestApi;
@@ -147,6 +151,8 @@ final class Plugin
         $listener = new ContentChangeListener;
         $deployHook = new DeployHook($config);
         $scheduler = new DeployScheduler($config, $deployHook);
+        $contentVersion = new ContentVersion;
+        $monitor = new PublishMonitor($config, $contentVersion, $scheduler, new BuildInfo($config));
         $webhook = new LeadWebhook($config);
         $leads = new LeadRepository;
         $notifier = new LeadNotifier($config);
@@ -158,7 +164,7 @@ final class Plugin
             new PageTemplates,
             new FieldRegistrar($config),
             new RestApi(
-                new SiteController($cache, new SiteNormalizer($fields, $refs, $uris, $ciudades, $ratings, new SiteSeo($rankMath, $refs), new LogoNormalizer($refs, new SvgSanitizer))),
+                new SiteController($cache, new SiteNormalizer($fields, $refs, $uris, $ciudades, $ratings, new SiteSeo($rankMath, $refs), new LogoNormalizer($refs, new SvgSanitizer)), $contentVersion),
                 new RoutesController($cache, $uris, $seo),
                 new ContentController($cache, $nodes),
                 new NodeController($cache, $nodes, $uris, $tokens),
@@ -167,14 +173,16 @@ final class Plugin
                 new LeadsController($signed, new LeadValidator, $leads, $notifier, $webhook, $limiter),
                 new RatingsController($cache, $ratings, $nodeLocator, $signed, $reviewInput, $limiter),
                 new ReviewsController($cache, $ratings, $nodeLocator, $signed, $reviewInput, $limiter),
+                new StatusController($monitor),
             ),
             new HttpCache,
             new Cors($config),
             $listener,
+            $contentVersion,
             new CacheInvalidator($cache),
             $scheduler,
             new DailyRebuild($config, $deployHook),
-            new DeployAdmin($config, $scheduler),
+            new DeployAdmin($config, $scheduler, $monitor),
             $webhook,
             $previews,
             new FrontendRedirect($config, $uris, $previews),

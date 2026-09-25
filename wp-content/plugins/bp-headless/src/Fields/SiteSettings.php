@@ -5,6 +5,7 @@ declare(strict_types=1);
 namespace BanosPortatiles\Headless\Fields;
 
 use BanosPortatiles\Headless\Config;
+use BanosPortatiles\Headless\Deploy\PublishStatus;
 use BanosPortatiles\Headless\Leads\QuoteCta;
 use BanosPortatiles\Headless\Normalizer\TocResolver;
 use BanosPortatiles\Headless\Reviews\RatingPolicy;
@@ -50,7 +51,7 @@ final class SiteSettings
             'position' => 3,
             'icon_url' => 'dashicons-admin-site-alt3',
             'update_button' => 'Guardar ajustes',
-            'updated_message' => 'Ajustes guardados. El sitio público se reconstruirá en ~1 minuto.',
+            'updated_message' => 'Ajustes guardados. El sitio público se actualiza en ~'.PublishStatus::estimateMinutes().' min.',
         ];
     }
 
