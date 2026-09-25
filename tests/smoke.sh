@@ -246,7 +246,8 @@ expect_no_header "sin Access-Control-Allow-Origin para orígenes ajenos" 'Access
 
 section "9b. Aviso «sitio en venta» (plugin bp-sitio-en-venta)"
 http "GET /bp-venta/v1/config" 200 "$VENTA/config"
-expect_json "forma del objeto (16 claves + version) y tipos" '(keys | length == 17) and (.enabled | type == "boolean") and (.modo | IN("venta","alquiler","venta_o_alquiler")) and (.colors | keys) == ["accent","accent_text","bg","text"] and (.placements | type == "object") and (.dismiss_days | type == "number") and (.version | test("^[0-9a-f]{12}$"))'
+expect_json "forma del objeto (16 claves + version) y tipos" '(keys | length == 17) and (.enabled | type == "boolean") and (.modo | IN("venta","alquiler","venta_o_alquiler")) and (.colors | keys) == ["accent","accent_text","bg","text","whatsapp_bg","whatsapp_text"] and (.placements | type == "object") and (.dismiss_days | type == "number") and (.version | test("^[0-9a-f]{12}$"))'
+expect_json "colores oficiales del botón de WhatsApp por defecto (1.0.3)" '.colors.whatsapp_bg == "#25d366" and .colors.whatsapp_text == "#ffffff"'
 expect_header "Cache-Control público" 'Cache-Control: public, max-age=60'
 venta_etag="$(grep -i '^ETag:' "$TMP/headers" | cut -d' ' -f2 | tr -d '\r')"
 http "config con If-None-Match → 304" 304 -H "If-None-Match: $venta_etag" "$VENTA/config"
@@ -262,11 +263,11 @@ wp_set_current_user(1);
 $_POST = $_REQUEST = ["_wpnonce" => wp_create_nonce("bp_sitio_en_venta_save"), "publish" => "1", "bpsev" => [
   "enabled" => "1", "modo" => "venta", "headline" => "Titular de prueba smoke", "message" => "", "whatsapp_number" => "300 000 0000",
   "show_whatsapp" => "1", "cta_whatsapp_label" => "", "show_secondary" => "1", "secondary_label" => "", "secondary_url" => "/sitio-en-venta/",
-  "colors" => ["bg" => "#0f172a", "text" => "#f8fafc", "accent" => "#25d366", "accent_text" => "#052e16"],
+  "colors" => ["bg" => "#0f172a", "text" => "#f8fafc", "accent" => "#25d366", "accent_text" => "#052e16", "whatsapp_bg" => "#128c7e", "whatsapp_text" => "#ffffff"],
   "placements" => ["top_bar"], "dismissible" => "1", "dismiss_days" => "5", "exclude_paths" => "/cotizar/"]];
 (new BanosPortatiles\SitioEnVenta\Admin\SettingsPage(BanosPortatiles\SitioEnVenta\Plugin::store()))->save();' >/dev/null
 http "config tras «Guardar y publicar» desde el admin" 200 "$VENTA/config"
-expect_json "cambios visibles al instante (caché invalidada) y E.164 normalizado" '.headline == "Titular de prueba smoke" and .whatsapp_number == "+573000000000" and .show_whatsapp == true and .dismiss_days == 5 and .placements.top_bar == true and ([.placements[]] | map(select(.)) | length == 1) and (.message | startswith("Dominio"))'
+expect_json "cambios visibles al instante (caché invalidada) y E.164 normalizado" '.headline == "Titular de prueba smoke" and .whatsapp_number == "+573000000000" and .show_whatsapp == true and .dismiss_days == 5 and .placements.top_bar == true and ([.placements[]] | map(select(.)) | length == 1) and (.message | startswith("Dominio")) and .colors.whatsapp_bg == "#128c7e"'
 [[ "$(jq -r .version "$TMP/body")" != "$(jq -r .version "$TMP/venta.json")" ]] && ok "version cambia (el front reinicia los avisos cerrados)" || ko "version sin cambios"
 [[ "$(curl -s "$API/site" | jq -r '.sale_banner.headline')" == "Titular de prueba smoke" ]] && ok "/site → sale_banner actualizado (caché de bp-headless invalidada)" || ko "/site → sale_banner desactualizado"
 [[ "$(wp transient get bp_sitio_en_venta_notice_1 --format=json | jq -r '.published')" == "scheduled" ]] && ok "«Guardar y publicar» programó el deploy vía bp-headless" || ko "publicación no programada"

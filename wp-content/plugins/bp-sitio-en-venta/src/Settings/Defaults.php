@@ -26,12 +26,38 @@ final class Defaults
         'footer_block' => ['label' => 'Bloque en el footer', 'help' => 'Antes del pie de página, en todo el sitio.'],
     ];
 
+    /**
+     * Banner colors. whatsapp_bg / whatsapp_text: the WhatsApp button (official brand colors by default; white
+     * on #25D366 is 1.98:1, below WCAG AA, and the settings page warns about it).
+     */
     public const COLORS = [
         'bg' => '#0f172a',
         'text' => '#f8fafc',
         'accent' => '#25d366',
         'accent_text' => '#052e16',
+        'whatsapp_bg' => '#25d366',
+        'whatsapp_text' => '#ffffff',
     ];
+
+    /**
+     * Stored colors over the defaults, in the order of COLORS (options saved before a color existed get its
+     * default).
+     *
+     * @return array<string, string>
+     */
+    public static function colors(mixed $stored): array
+    {
+        $colors = self::COLORS;
+        if (is_array($stored)) {
+            foreach (array_keys(self::COLORS) as $key) {
+                if (is_string($stored[$key] ?? null) && $stored[$key] !== '') {
+                    $colors[$key] = $stored[$key];
+                }
+            }
+        }
+
+        return $colors;
+    }
 
     public const SECONDARY_URL = '/sitio-en-venta/';
 

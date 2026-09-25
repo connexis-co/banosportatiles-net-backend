@@ -1,5 +1,5 @@
 /* «Sitio en venta» — shared notice styles (admin preview; reusable by any front).
-   Colors come from CSS variables: --bpv-bg, --bpv-text, --bpv-accent, --bpv-accent-text. */
+   Colors come from CSS variables: --bpv-bg, --bpv-text, --bpv-accent, --bpv-accent-text, --bpv-wa-bg, --bpv-wa-text. */
 .bpv-bar,
 .bpv-card {
   --bpv-radius: 10px;
@@ -34,7 +34,7 @@
   line-height: 1.2;
   border: 2px solid transparent;
 }
-.bpv-btn--wa { background: var(--bpv-accent, #25d366); color: var(--bpv-accent-text, #052e16); }
+.bpv-btn--wa { background: var(--bpv-wa-bg, #25d366); color: var(--bpv-wa-text, #ffffff); }
 .bpv-btn--ghost { border-color: currentColor; color: var(--bpv-text, #f8fafc); background: transparent; }
 .bpv-btn:hover { filter: brightness(1.06); }
 .bpv-btn:focus-visible, .bpv-close:focus-visible { outline: 3px solid var(--bpv-accent, #25d366); outline-offset: 2px; }

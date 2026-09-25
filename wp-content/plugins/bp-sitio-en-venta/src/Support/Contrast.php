@@ -34,17 +34,20 @@ final class Contrast
     }
 
     /**
-     * Pairs checked for the banner: text on background, button text on button, button on background.
+     * Pairs checked for the banner: text on background, accent label (badge) text on the accent, accent on
+     * background, and the WhatsApp button (text on button, button on background).
      *
-     * @param  array<string, string>  $colors  bg, text, accent, accent_text
+     * @param  array<string, string>  $colors  bg, text, accent, accent_text, whatsapp_bg, whatsapp_text
      * @return list<array{pair: string, label: string, ratio: float, minimum: float, ok: bool}>
      */
     public static function report(array $colors): array
     {
         $pairs = [
             ['text', 'bg', 'Texto sobre el fondo', self::AA_TEXT],
-            ['accent_text', 'accent', 'Texto del botón sobre el botón', self::AA_TEXT],
-            ['accent', 'bg', 'Botón sobre el fondo', self::AA_UI],
+            ['accent_text', 'accent', 'Texto de la etiqueta sobre el acento', self::AA_TEXT],
+            ['accent', 'bg', 'Acento sobre el fondo', self::AA_UI],
+            ['whatsapp_text', 'whatsapp_bg', 'Texto del botón de WhatsApp sobre el botón', self::AA_TEXT],
+            ['whatsapp_bg', 'bg', 'Botón de WhatsApp sobre el fondo', self::AA_UI],
         ];
 
         $report = [];

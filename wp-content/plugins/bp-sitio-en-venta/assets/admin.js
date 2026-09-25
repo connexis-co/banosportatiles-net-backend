@@ -173,12 +173,21 @@
   const format = (n) => n.toFixed(2).replace(/\.?0+$/, '').replace('.', ',');
 
   const renderColors = () => {
-    const colors = { bg: colorValue('bg'), text: colorValue('text'), accent: colorValue('accent'), accent_text: colorValue('accent_text') };
+    const colors = {
+      bg: colorValue('bg'),
+      text: colorValue('text'),
+      accent: colorValue('accent'),
+      accent_text: colorValue('accent_text'),
+      whatsapp_bg: colorValue('whatsapp_bg'),
+      whatsapp_text: colorValue('whatsapp_text'),
+    };
     $$('[data-bpv-theme]').forEach((node) => {
       node.style.setProperty('--bpv-bg', colors.bg);
       node.style.setProperty('--bpv-text', colors.text);
       node.style.setProperty('--bpv-accent', colors.accent);
       node.style.setProperty('--bpv-accent-text', colors.accent_text);
+      node.style.setProperty('--bpv-wa-bg', colors.whatsapp_bg);
+      node.style.setProperty('--bpv-wa-text', colors.whatsapp_text);
     });
     const list = form.querySelector('[data-bpsev-contrast]');
     if (!list) {
@@ -187,8 +196,10 @@
     const aa = cfg.aa || { text: 4.5, ui: 3 };
     const checks = [
       ['Texto sobre el fondo', colors.text, colors.bg, aa.text],
-      ['Texto del botón sobre el botón', colors.accent_text, colors.accent, aa.text],
-      ['Botón sobre el fondo', colors.accent, colors.bg, aa.ui],
+      ['Texto de la etiqueta sobre el acento', colors.accent_text, colors.accent, aa.text],
+      ['Acento sobre el fondo', colors.accent, colors.bg, aa.ui],
+      ['Texto del botón de WhatsApp sobre el botón', colors.whatsapp_text, colors.whatsapp_bg, aa.text],
+      ['Botón de WhatsApp sobre el fondo', colors.whatsapp_bg, colors.bg, aa.ui],
     ];
     list.replaceChildren(...checks.map(([label, fg, bg, min]) => {
       const value = ratio(fg, bg);
