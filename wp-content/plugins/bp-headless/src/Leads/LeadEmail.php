@@ -16,9 +16,10 @@ final class LeadEmail
 
     /**
      * Context: ciudad = display name of the city term (when the slug matches one); origin = absolute URL
-     * of the page where the form was sent; created = unix timestamp of the lead.
+     * of the page where the form was sent; created = unix timestamp of the lead; front = public site URL
+     * (links of servicio_uri and landing).
      *
-     * @param  array{reference: string, created: int, ciudad: ?string, origin: ?string, admin: string, site: string}  $context
+     * @param  array{reference: string, created: int, ciudad: ?string, origin: ?string, admin: string, site: string, front?: string}  $context
      */
     public function __construct(private readonly LeadData $lead, private readonly array $context) {}
 
@@ -93,6 +94,7 @@ final class LeadEmail
             ['Cantidad', $lead->cantidad !== null ? (string) $lead->cantidad : '—', null],
             ['Mensaje', $lead->mensaje ?? '—', null],
             ['URL de origen', $this->context['origin'] ?? '—', $this->context['origin']],
+            ...$this->attributionRows(),
             ['UTM', $utm !== [] ? implode(', ', $utm) : '—', null],
             ['Tratamiento de datos', 'Aceptado (Ley 1581 de 2012)', null],
             ['Comunicaciones comerciales', $lead->consentimientoComercial ? 'Sí, acepta' : 'No', null],
@@ -100,6 +102,32 @@ final class LeadEmail
             ['Referencia', $this->context['reference'], null],
             ['Ver en el CMS', $this->context['admin'], $this->context['admin']],
         ];
+
+        return $rows;
+    }
+
+    /**
+     * CTA location, service page, landing and referrer (only the ones sent) and the acquisition channel.
+     *
+     * @return list<array{0: string, 1: string, 2: ?string}>
+     */
+    private function attributionRows(): array
+    {
+        $attribution = $this->lead->attribution();
+        $front = rtrim($this->context['front'] ?? '', '/');
+        $rows = [];
+        if (isset($attribution['origen'])) {
+            $rows[] = ['Botón', LeadAttribution::origin($attribution['origen']), null];
+        }
+        foreach (['servicio_uri' => 'Servicio (página)', 'landing' => 'Primera página de la visita'] as $key => $label) {
+            if (isset($attribution[$key])) {
+                $rows[] = [$label, $attribution[$key], $front !== '' ? $front.$attribution[$key] : null];
+            }
+        }
+        if (isset($attribution['referrer'])) {
+            $rows[] = ['Llegó desde', $attribution['referrer'], $attribution['referrer']];
+        }
+        $rows[] = ['Canal', LeadAttribution::channel($attribution), null];
 
         return $rows;
     }

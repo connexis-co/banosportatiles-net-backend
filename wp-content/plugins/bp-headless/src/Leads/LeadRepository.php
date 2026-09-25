@@ -55,6 +55,8 @@ final class LeadRepository
             'user_agent' => mb_substr($context['user_agent'], 0, 255),
             'estado' => 'nuevo',
         ];
+        // Attribution: one meta per field with its contract name (only the ones sent).
+        $meta += $lead->attribution();
         foreach ($meta as $key => $value) {
             update_post_meta($id, self::META_PREFIX.$key, $value);
         }
@@ -98,9 +100,33 @@ final class LeadRepository
                 utm: is_array($utm) ? array_map('strval', array_filter($utm, 'is_scalar')) : [],
                 consentimiento: true,
                 consentimientoComercial: self::meta($leadId, 'consentimiento_comercial') === '1',
+                origen: $optional('origen'),
+                servicioUri: $optional('servicio_uri'),
+                referrer: $optional('referrer'),
+                landing: $optional('landing'),
             ),
             'reference' => self::meta($leadId, 'ref'),
         ];
+    }
+
+    /**
+     * Stored attribution with contract names; utm_* and click ids fall back to the "utm" JSON of leads created
+     * before they had their own meta.
+     *
+     * @return array<string, string>
+     */
+    public static function attribution(int $leadId): array
+    {
+        $utm = json_decode(self::meta($leadId, 'utm'), true);
+        $values = is_array($utm) ? LeadAttribution::fromUtm($utm) : [];
+        foreach (array_keys(LeadAttribution::LABELS) as $key) {
+            $value = self::meta($leadId, $key);
+            if ($value !== '') {
+                $values[$key] = $value;
+            }
+        }
+
+        return array_intersect_key(array_replace(LeadAttribution::LABELS, $values), $values);
     }
 
     public static function meta(int $leadId, string $key): string

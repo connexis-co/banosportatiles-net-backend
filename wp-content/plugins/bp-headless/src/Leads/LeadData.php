@@ -25,7 +25,29 @@ final readonly class LeadData
         public array $utm = [],
         public bool $consentimiento = true,
         public bool $consentimientoComercial = false,
+        public ?string $origen = null,
+        public ?string $servicioUri = null,
+        public ?string $referrer = null,
+        public ?string $landing = null,
     ) {}
+
+    /**
+     * Attribution as stored and shown (contract names): origen, servicio_uri, referrer, landing, utm_* and
+     * click ids. Empty values are left out.
+     *
+     * @return array<string, string>
+     */
+    public function attribution(): array
+    {
+        $values = array_filter([
+            'origen' => $this->origen,
+            'servicio_uri' => $this->servicioUri,
+            'referrer' => $this->referrer,
+            'landing' => $this->landing,
+        ], static fn (?string $value): bool => $value !== null && $value !== '');
+
+        return $values + LeadAttribution::fromUtm($this->utm);
+    }
 
     /**
      * @return array<string, mixed>
@@ -45,6 +67,10 @@ final readonly class LeadData
             'utm' => $this->utm,
             'consentimiento' => $this->consentimiento,
             'consentimiento_comercial' => $this->consentimientoComercial,
+            'origen' => $this->origen,
+            'servicio_uri' => $this->servicioUri,
+            'referrer' => $this->referrer,
+            'landing' => $this->landing,
         ];
     }
 }

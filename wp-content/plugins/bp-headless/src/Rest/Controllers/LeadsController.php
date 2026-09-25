@@ -17,6 +17,8 @@ use BanosPortatiles\Headless\Security\SignedRequestGuard;
  *
  * 1. authorize(): SignedRequestGuard — secret (503) → failed-auth throttle (429) → HMAC + ±5 min (401) → replay (401).
  * 2. handle(): JSON (400) → validation (422) → per-client throttle (429) → lead + email + webhook (201).
+ *    Attribution (origen, servicio_uri, referrer, landing, utm_*, click ids) never causes a 422: fields with a
+ *    wrong format are dropped and listed in the 201 response as "ignored".
  */
 final class LeadsController
 {
@@ -75,7 +77,8 @@ final class LeadsController
         $this->webhook->schedule($created['id']);
         do_action('bp_headless/lead_created', $created['id'], $result->lead);
 
-        $response = new \WP_REST_Response(['ok' => true, 'reference' => $created['reference']], 201);
+        // "ignored": attribution fields dropped because of their format (the lead is saved anyway).
+        $response = new \WP_REST_Response(['ok' => true, 'reference' => $created['reference']] + ($result->ignored !== [] ? ['ignored' => $result->ignored] : []), 201);
         $response->header('Cache-Control', 'no-store');
 
         return $response;
