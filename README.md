@@ -34,7 +34,7 @@ cd ~/dev/banosportatiles-net/backend   # (también accesible por el symlink de ~
 bin/setup.sh            # idempotente: .env con secretos aleatorios → contenedores → WP instalado → seed importado
 composer install        # Pest, Pint, PHPStan (dev)
 composer check          # pint --test + phpstan (nivel 8) + pest
-tests/smoke.sh          # 188 comprobaciones end-to-end contra el Docker levantado (con el seed-sample)
+tests/smoke.sh          # 201 comprobaciones end-to-end contra el Docker levantado (con el seed-sample)
 deploy/cloudpanel/sim/run.sh   # deploy a CloudPanel simulado en Docker (17 comprobaciones)
 ```
 
@@ -98,7 +98,7 @@ una raíz de composición (`Plugin::boot()`) que registra módulos `Hookable`.
 | `Cache/` | Caché de respuestas en transients con versión, invalidada por `ContentChangeListener` (posts, términos, opciones, redirecciones) |
 | `Leads/` | Validación pura, rate limit con transients, repositorio CPT, email (`wp_mail`) y webhook firmado vía WP-Cron |
 | `Security/` | HMAC, tokens de preview, XML-RPC/emojis/oEmbed off, comentarios off (UI + REST), `/wp/v2/users` con auth, headers de seguridad en el admin |
-| `Headless/` | Redirección 301 del front al sitio público, `noindex` total del host y links de preview al front |
+| `Headless/` | Raíz del CMS → `/wp-admin/` (302), redirección 301 del resto del front al sitio público, `noindex` total del host y links de preview al front |
 | `Deploy/` | Deploy hook con debounce por tipo de cambio (60 s contenido, ventana de 15 min reseñas), rebuild diario programable, botón «Publicar cambios en el sitio» y widget del dashboard |
 | `Reviews/` | Valoraciones y opiniones: `ReviewsGateway` (`SiteReviewsGateway` / `NullReviewsGateway`), política por tipo y por página, resumen y normalizador puros, validación, bloqueo de las vías públicas de Site Reviews, invalidación + deploy, columna «Valoración» |
 | `Seo/` | `SeoNormalizer` elige la fuente: `RankMathSeoSource` (meta `rank_math_*` + plantillas y variables de Rank Math) o `ScfSeoSource`; canonical público, setup de Rank Math y migración SCF → Rank Math |
@@ -172,7 +172,8 @@ camelCase. Las imágenes son `{src, width, height, alt}` con `src` absoluto al C
 
 | Método y ruta | Auth | Respuesta |
 |---|---|---|
-| `GET /site` | pública | marca (logo SVG saneado), cabecera, menús (principal, secundario, footer), banner de venta, contacto, legal, analítica, formularios, `ciudades[]`, `categorias[]`, `ratings`, `toc`, `microcopy`, `seo` |
+| `GET /status` | pública, sin caché | estado de publicación: `{contentVersion, lastChangeAt, deploy, build?, publish, now}` (ver «Estado de publicación») |
+| `GET /site` | pública | `contentVersion` (versión del contenido, sin caché), marca (logo SVG saneado), cabecera, menús (principal, secundario, footer), banner de venta, contacto, legal, analítica, formularios, `ciudades[]`, `categorias[]`, `ratings`, `toc`, `microcopy`, `seo` |
 | `GET /routes` | pública | `[{uri, type, id, template, modified, noindex}]` |
 | `GET /content?type=page\|post\|equipo&page=1&per_page=50` | pública | `Node[]` + `X-WP-Total` / `X-WP-TotalPages` (máx. 100 por página) |
 | `GET /node?uri=/ruta/` | pública; `?token=` → borradores | un `Node` (`404` si no está publicado; `400` sin `uri`) |
@@ -279,7 +280,7 @@ hijos con `icon?` y `group?`, `menus.secondary[] {label, href, icon?}`, `ciudade
 `ratings {enabled, types, minCountForSchema, autoApproveReviews, texts}`, `toc {enabled_types, title, titleBlog, depth, depthBlog?, min, numbered, collapsedMobile, sticky}`,
 `microcopy` (los textos vacíos se omiten para que el front use los suyos) y `seo {siteName, separator, defaultOgImage?}` (de Rank Math si está activo).
 Desde la 1.2.0, `forms {turnstile_site_key, cta_mode: "modal"|"page", modal: {eyebrow, title, subtitle, success}, whatsapp: {bg, text}}`: nunca vacío, con valores por defecto (modal, los textos del front y `#25d366`/`#ffffff`).
-Los colores van en minúsculas `#rrggbb`. `sale_banner.colors` suma `whatsapp_bg` y `whatsapp_text` (bp-sitio-en-venta 1.0.3).
+Los colores van en minúsculas `#rrggbb`. `sale_banner.colors` suma `whatsapp_bg` y `whatsapp_text` (bp-sitio-en-venta 1.0.3). La 1.0.4 suma `sale_banner.cta_whatsapp_short` (≤ 18, barra en móvil) y `sale_banner.whatsapp_note` (≤ 140), porque el WhatsApp del aviso es solo para comprar o alquilar el sitio.
 
 **Valoraciones y opiniones** (Site Reviews detrás de `Reviews\ReviewsGateway`):
 - Cada voto rápido es una reseña **solo con estrellas**: se aprueba sola, va a la categoría «Calificación» y no manda email al admin.
@@ -380,8 +381,46 @@ Cualquier cambio publicado (páginas, posts, equipos, FAQs, términos, ajustes o
 deploy hook 60 s después, reiniciando el contador con cada cambio (debounce). Los cambios de reseñas visibles en el sitio
 (voto aprobado, aprobar, desaprobar, editar o borrar una aprobada, responder) abren una **ventana de 15 min** que no se
 reinicia; un deploy ya en cola los incluye. Las opiniones pendientes solo vacían la caché. «Ajustes del sitio → Despliegue →
-Rebuild diario» (activo por defecto a las 04:00, hora del sitio) refresca el `AggregateRating` del JSON-LD aunque nadie edite. El admin incluye el botón «Publicar cambios en el
-sitio» en la barra superior y un widget del dashboard con el último disparo, su resultado y el siguiente programado.
+Rebuild diario» (activo por defecto a las 04:00, hora del sitio) refresca el `AggregateRating` del JSON-LD aunque nadie edite.
+
+### Estado de publicación (1.3.0)
+
+WordPress sabe si el sitio público ya muestra lo último que se guardó.
+
+1. **`contentVersion`**: versión opaca con fecha. Cambia con cada cambio que hay que publicar: contenido, ajustes, redirecciones, aviso de venta, reseñas visibles e import del seed. No es la versión de la caché de la API, que también cambia con opiniones pendientes y flushes manuales. `/site` la expone.
+2. **`build.json`**: el build de Astro copia esa versión en `https://banosportatiles.net/build.json` → `{contentVersion, builtAt, commit?}`. WordPress lo lee desde el servidor con timeout de 3 s y un transient de 20 s.
+3. **Estados** (`Deploy\PublishStatus`, puro):
+
+| Estado | Cuándo | Barra de admin |
+|---|---|---|
+| `scheduled` | hay un deploy en cola (debounce) | «Publicación programada · en 45 s» |
+| `publishing` | el hook respondió 2xx después del último cambio y build.json aún no tiene ese build | «Publicando… · 1 min 20 s» + barra de progreso (estimado 3 min) |
+| `published` | build.json tiene la `contentVersion` actual | «Sitio publicado ✓ · hace 3 min» |
+| `error` | el hook no respondió 2xx, o pasaron 15 min sin la versión nueva | «Error al publicar» |
+| `pending` | hay cambios que ningún deploy publicará (sin hook, o guardado sin publicar) | «Cambios sin publicar» |
+| `unknown` | no se puede leer build.json y nada más indica el estado | «Estado del sitio público desconocido» |
+
+`GET /bp/v1/status` (pública, `Cache-Control: no-store`):
+
+```json
+{
+  "contentVersion": "tlwlyj-df8af4",
+  "lastChangeAt": "2026-09-25T10:15:31-05:00",
+  "deploy": {"scheduledFor": "…", "lastTriggerAt": "2026-09-25T10:16:31-05:00", "lastTriggerStatus": "ok", "lastTriggerHttp": 200},
+  "build": {"contentVersion": "tlwlyd-1954b2", "builtAt": "2026-09-25T09:58:02-05:00", "commit": "abc1234"},
+  "publish": {"state": "publishing", "label": "Publicando…", "detail": "1 min 20 s", "color": "#2271b1", "poll": true,
+              "since": "2026-09-25T10:16:31-05:00", "progress": 0.44, "estimateSeconds": 180},
+  "now": "2026-09-25T10:17:51-05:00"
+}
+```
+
+Las claves de `deploy` son opcionales y se omiten cuando no aplican: `scheduledFor` (hay deploy en cola), `lastTriggerAt` y `lastTriggerStatus` (`ok`, `error` o `skipped` sin hook), y `lastTriggerHttp`. `build` se omite si build.json no se pudo leer. En `publish`, `since`, `until` y `progress` aparecen según el estado.
+
+En el admin (editores y administradores):
+- **Barra superior:** punto de color y estado, con «Publicar ahora» y «Ver el sitio público» en su menú.
+- **Widget del dashboard:** versiones, cola, último envío al hook y rebuild diario.
+- **Al guardar:** «Guardado. El sitio público se actualiza en ~4 min.» Es un aviso en las pantallas clásicas y un snackbar en el editor de bloques.
+- **Actualización:** la página no espera a build.json. `assets/publish-status.js` consulta `/status` si falta ese dato y cada 15 s **solo** mientras el estado es `scheduled` o `publishing` (una petición a la vez, en pausa con la pestaña oculta).
 
 ## Seed → WordPress
 
@@ -402,10 +441,10 @@ sitio» en la barra superior y un widget del dashboard con el último disparo, s
 
 | Herramienta | Resultado |
 |---|---|
-| `vendor/bin/pest` | 306 tests / 1430 aserciones (HtmlCleaner, Slugger, UriResolver, HMAC, PreviewToken, validación, email y rate limit de leads, normalizadores, ciudades, round-trip seed → SCF → API, grupos SCF, bundle, HTTP/CORS, SMTP, flags; aviso de venta: saneamiento, E.164, contraste WCAG, forma del REST y exclusión de rutas; 1.1.0: resumen, reseñas, política y controladores HMAC de valoraciones (401, 422, 429, 403, 409, duplicado, actualización del voto), precios, TOC, fuentes de SEO con Rank Math simulado, canonical, migración a Rank Math, `site.seo` → Rank Math y setup sin pisar al editor, sanitizador SVG, menús/textos/regiones, imágenes de sección, deduplicación de medios, huella de las imágenes en el hash del ítem, debounce del deploy y contrato del Node sin `null`; 1.2.0: atribución del lead (validación tolerante, metas, email, columna «Origen»), `node.lead`, `/site → forms`, selector de servicios, importación de `forms` y `lead`, colores de WhatsApp del aviso de venta) |
+| `vendor/bin/pest` | 330 tests / 1603 aserciones (HtmlCleaner, Slugger, UriResolver, HMAC, PreviewToken, validación, email y rate limit de leads, normalizadores, ciudades, round-trip seed → SCF → API, grupos SCF, bundle, HTTP/CORS, SMTP, flags; aviso de venta: saneamiento, E.164, contraste WCAG, forma del REST y exclusión de rutas; 1.1.0: resumen, reseñas, política y controladores HMAC de valoraciones (401, 422, 429, 403, 409, duplicado, actualización del voto), precios, TOC, fuentes de SEO con Rank Math simulado, canonical, migración a Rank Math, `site.seo` → Rank Math y setup sin pisar al editor, sanitizador SVG, menús/textos/regiones, imágenes de sección, deduplicación de medios, huella de las imágenes en el hash del ítem, debounce del deploy y contrato del Node sin `null`; 1.2.0: atribución del lead (validación tolerante, metas, email, columna «Origen»), `node.lead`, `/site → forms`, selector de servicios, importación de `forms` y `lead`, colores de WhatsApp del aviso de venta; 1.3.0: estados de publicación, build.json, contentVersion, raíz del CMS → admin, textos y campos nuevos del aviso de venta) |
 | `vendor/bin/pint --test` | preset laravel + `declare_strict_types` |
 | `vendor/bin/phpstan` | **nivel 8**, `phpVersion` 8.3, con stubs de WordPress, SCF/ACF y WP-CLI, sin baseline ni ignores |
-| `tests/smoke.sh` | 188 comprobaciones end-to-end (endpoints, forma del JSON, ETag/304, invalidación, leads 201/401/422/429, replay, email del lead con To/Cc/Reply-To/HTML, `BP_LEADS_EMAIL=false`, fallo SMTP → `email_failed` → `leads resend`, SMTP con STARTTLS + AUTH obligatorios, webhook firmado, 301 del front, robots, previews, hardening, CORS, deploy hook, aviso de venta: forma, 304, `?path`, fuente única con `/site`, guardar y publicar desde el admin; 1.1.0: plugins y setups idempotentes, ningún `null`, `/site` y Node nuevos, `/ratings` y `/reviews` (304, 403, 404, 400), voto 201 → duplicado 200 → visible en Site Reviews con su categoría y deploy en ventana, opinión 201 pendiente → 409 → actualización del voto, email fuera de la API, vías públicas de Site Reviews cerradas y limpieza con `wp bp reviews purge`; 1.2.0: lead con atribución (metas, columna «Origen», email con canal, `ignored`), `/site → forms`, `node.lead` automático y con la caja «Cotización», colores de WhatsApp en `/bp-venta/v1/config`) |
+| `tests/smoke.sh` | 201 comprobaciones end-to-end (endpoints, forma del JSON, ETag/304, invalidación, leads 201/401/422/429, replay, email del lead con To/Cc/Reply-To/HTML, `BP_LEADS_EMAIL=false`, fallo SMTP → `email_failed` → `leads resend`, SMTP con STARTTLS + AUTH obligatorios, webhook firmado, 301 del front, robots, previews, hardening, CORS, deploy hook, aviso de venta: forma, 304, `?path`, fuente única con `/site`, guardar y publicar desde el admin; 1.1.0: plugins y setups idempotentes, ningún `null`, `/site` y Node nuevos, `/ratings` y `/reviews` (304, 403, 404, 400), voto 201 → duplicado 200 → visible en Site Reviews con su categoría y deploy en ventana, opinión 201 pendiente → 409 → actualización del voto, email fuera de la API, vías públicas de Site Reviews cerradas y limpieza con `wp bp reviews purge`; 1.2.0: lead con atribución (metas, columna «Origen», email con canal, `ignored`), `/site → forms`, `node.lead` automático y con la caja «Cotización», colores de WhatsApp en `/bp-venta/v1/config`; 1.3.0: raíz del CMS → 302 al admin, `/status` programado → publicando → publicado, `contentVersion` en `/site` y tras un voto, texto corto y aviso del WhatsApp) |
 | `deploy/cloudpanel/sim/run.sh` | 17 comprobaciones del deploy real contra un CloudPanel simulado (pasada nueva, idempotente y `--seed-force`; plugins nuevos, setups y nombre del sitio en Rank Math) |
 
 ## Despliegue
