@@ -231,6 +231,9 @@ http "atribución inválida no bloquea el lead → 201" 201 -X POST "$API/leads"
 expect_json "ignored lista lo descartado" '.ignored == ["origen","referrer","gclid"]'
 
 section "8. Headless: redirección del front, noindex y previews"
+http "raíz del CMS → 302 al admin" 302 "$BASE/"
+expect_header "Location /wp-admin/" "Location: $BASE/wp-admin/"
+expect_header "sin caché" 'Cache-Control: no-cache, must-revalidate, max-age=0'
 http "front del CMS → 301" 301 "$BASE/cualquier/ruta/?utm_source=x"
 expect_header "Location conserva ruta y query" "Location: $FRONT/cualquier/ruta/?utm_source=x"
 expect_header "X-Robots-Tag en el front" 'X-Robots-Tag: noindex, nofollow'

@@ -9,9 +9,11 @@ use BanosPortatiles\Headless\Contracts\Hookable;
 use BanosPortatiles\Headless\Routing\UriResolver;
 
 /**
- * The CMS host has no public front: every template request is redirected (301) to BP_FRONTEND_URL.
- * Singular content and categories map to their public URI; anything else keeps its path and query.
- * Admin, login, REST, AJAX, cron, WP-CLI, robots.txt and static assets are untouched.
+ * The CMS host has no public front. Its root (admin.banosportatiles.net/, without query) goes to the admin (302;
+ * WordPress sends visitors without a session to the login), so editors land where they work. Every other
+ * template request is redirected (301) to BP_FRONTEND_URL: singular content and categories map to their public
+ * URI; anything else keeps its path and query. Previews, admin, login, REST, AJAX, cron, WP-CLI, robots.txt and
+ * static assets are untouched.
  */
 final class FrontendRedirect implements Hookable
 {
@@ -39,15 +41,23 @@ final class FrontendRedirect implements Hookable
         }
 
         [$target, $status] = $this->target($requestUri);
+        if ($status === 302) {
+            nocache_headers();
+        }
         wp_redirect($target, $status, 'BP Headless');
         exit;
     }
 
     /**
+     * Where a front request of the CMS host goes: [URL, HTTP status].
+     *
      * @return array{0: string, 1: int}
      */
-    private function target(string $requestUri): array
+    public function target(string $requestUri): array
     {
+        if (self::isRoot($requestUri)) {
+            return [admin_url(), 302];
+        }
         $front = $this->config->frontendUrl();
         $object = get_queried_object();
 
@@ -68,6 +78,12 @@ final class FrontendRedirect implements Hookable
         }
 
         return [$front.$requestUri, 301];
+    }
+
+    /** "/" (or "/?") without a query string: the bare CMS host. */
+    public static function isRoot(string $requestUri): bool
+    {
+        return rtrim($requestUri, '?') === '/';
     }
 
     private static function requestUri(): string
