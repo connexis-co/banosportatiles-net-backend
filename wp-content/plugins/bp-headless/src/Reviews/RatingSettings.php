@@ -24,9 +24,9 @@ final readonly class RatingSettings
 
     /** @var array<string, array{stars: bool, reviews: bool}> */
     public const DEFAULT_TYPES = [
-        'servicios' => ['stars' => true, 'reviews' => false],
-        'ciudades' => ['stars' => true, 'reviews' => false],
-        'equipos' => ['stars' => true, 'reviews' => false],
+        'servicios' => ['stars' => true, 'reviews' => true],
+        'ciudades' => ['stars' => true, 'reviews' => true],
+        'equipos' => ['stars' => true, 'reviews' => true],
         'blog' => ['stars' => true, 'reviews' => true],
         'otras' => ['stars' => false, 'reviews' => false],
     ];
@@ -47,6 +47,9 @@ final readonly class RatingSettings
         'reviewsEmpty' => 'reviews_empty',
         'formTitle' => 'form_title',
         'consent' => 'consent',
+        'summaryHelp' => 'summary_help',
+        'experienceHelp' => 'experience_help',
+        'blogHelp' => 'blog_help',
         'pending' => 'pending',
     ];
 
@@ -64,6 +67,9 @@ final readonly class RatingSettings
         'reviewsEmpty' => 'Todavía no hay comentarios. Cuéntanos tu experiencia o tu duda.',
         'formTitle' => 'Deja tu comentario',
         'consent' => 'Autorizo el tratamiento de mis datos personales para publicar y moderar mi comentario, conforme a la Ley 1581 de 2012.',
+        'summaryHelp' => 'Valoraciones enviadas por visitantes de esta página. Las opiniones con texto pasan por moderación.',
+        'experienceHelp' => 'Califica solo si usaste este servicio o equipo. Cuenta qué contrataste y cómo fue tu experiencia, sin datos personales.',
+        'blogHelp' => 'Califica la utilidad de esta guía y cuéntanos qué te ayudó o qué podemos mejorar.',
         'pending' => 'Recibimos tu comentario. Lo publicaremos cuando lo revisemos.',
     ];
 

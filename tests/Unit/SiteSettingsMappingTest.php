@@ -109,7 +109,7 @@ it('round-trips menus, texts, ratings and TOC: seed → SCF → /site', function
     $ratings = RatingSettings::fromOption($values['ratings'])->toSite(true);
     expect($ratings['minCountForSchema'])->toBe(2)
         ->and($ratings['types']['blog'])->toBe(['stars' => true, 'reviews' => true])
-        ->and($ratings['types']['ciudades'])->toBe(['stars' => true, 'reviews' => false])
+        ->and($ratings['types']['ciudades'])->toBe(['stars' => true, 'reviews' => true])
         ->and($ratings['texts']['reviewsTitle'])->toBe('Comentarios')
         ->and($ratings['texts']['firstVote'])->toBe('Sé el primero en calificar');
 

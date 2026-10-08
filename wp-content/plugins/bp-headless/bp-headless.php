@@ -3,7 +3,7 @@
 /**
  * Plugin Name:       BP Headless
  * Description:       Headless CMS layer for banosportatiles.net: content model (CPTs, taxonomies, SCF fields), REST API bp/v1, leads, ratings and reviews (Site Reviews), SEO (Rank Math), previews, deploy hook and hardening.
- * Version:           1.3.0
+ * Version:           1.3.1
  * Requires at least: 7.0
  * Requires PHP:      8.3
  * Author:            Connexis
@@ -20,7 +20,7 @@ if (! defined('ABSPATH')) {
     exit;
 }
 
-const VERSION = '1.3.0';
+const VERSION = '1.3.1';
 const PLUGIN_FILE = __FILE__;
 
 if (PHP_VERSION_ID < 80300) {

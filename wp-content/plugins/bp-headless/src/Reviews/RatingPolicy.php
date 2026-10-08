@@ -47,7 +47,7 @@ final class RatingPolicy
     /** @param mixed $override SCF value of the per-post group: {stars: inherit|yes|no, reviews: inherit|yes|no}. */
     public static function resolve(RatingSettings $settings, string $template, mixed $override): RatingFlags
     {
-        if (! $settings->enabled) {
+        if (! $settings->enabled || in_array($template, self::EXCLUDED_TEMPLATES, true)) {
             return RatingFlags::off();
         }
 

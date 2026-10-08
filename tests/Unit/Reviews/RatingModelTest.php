@@ -108,7 +108,7 @@ it('maps templates to rating types and keeps self-serving pages off by default',
         ->and(RatingPolicy::typeFor('landing'))->toBe('otras')
         ->and(RatingPolicy::typeFor('home'))->toBeNull()
         ->and(RatingPolicy::resolve($settings, 'post', null))->toEqual(new RatingFlags(true, true))
-        ->and(RatingPolicy::resolve($settings, 'servicio', null))->toEqual(new RatingFlags(true, false))
+        ->and(RatingPolicy::resolve($settings, 'servicio', null))->toEqual(new RatingFlags(true, true))
         ->and(RatingPolicy::resolve($settings, 'landing', null))->toEqual(RatingFlags::off());
 
     foreach (RatingPolicy::EXCLUDED_TEMPLATES as $template) {
@@ -121,7 +121,7 @@ it('applies the per-post override and the global switch', function (): void {
     $off = RatingSettings::fromOption(['enabled' => false]);
 
     expect(RatingPolicy::resolve($settings, 'servicio', ['stars' => 'no', 'reviews' => 'yes']))->toEqual(new RatingFlags(false, true))
-        ->and(RatingPolicy::resolve($settings, 'home', ['stars' => 'yes', 'reviews' => 'inherit']))->toEqual(new RatingFlags(true, false))
+        ->and(RatingPolicy::resolve($settings, 'home', ['stars' => 'yes', 'reviews' => 'inherit']))->toEqual(RatingFlags::off())
         ->and(RatingPolicy::resolve($off, 'post', ['stars' => 'yes', 'reviews' => 'yes']))->toEqual(RatingFlags::off());
 });
 
@@ -139,7 +139,7 @@ it('reads the site settings with defaults and exposes the /site shape', function
     expect($site['enabled'])->toBeTrue()
         ->and($site['types']['equipos'])->toBe(['stars' => true, 'reviews' => true])
         ->and($site['types']['blog'])->toBe(['stars' => false, 'reviews' => false])
-        ->and($site['types']['servicios'])->toBe(['stars' => true, 'reviews' => false])
+        ->and($site['types']['servicios'])->toBe(['stars' => true, 'reviews' => true])
         ->and($site['minCountForSchema'])->toBe(3)
         ->and($site['autoApproveReviews'])->toBeFalse()
         ->and(array_keys($site['texts']))->toBe(array_keys(RatingSettings::TEXT_FIELDS))

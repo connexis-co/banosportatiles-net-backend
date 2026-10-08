@@ -271,6 +271,9 @@ final class SiteSettings
                 $x->text('reviews_empty', 'Texto cuando aún no hay opiniones', ['default_value' => RatingSettings::DEFAULT_TEXTS['reviewsEmpty']]),
                 $x->text('form_title', 'Título del formulario', ['default_value' => RatingSettings::DEFAULT_TEXTS['formTitle']]),
                 $x->textarea('consent', 'Texto del consentimiento', ['default_value' => RatingSettings::DEFAULT_TEXTS['consent'], 'rows' => 2]),
+                $x->textarea('summary_help', 'Nota sobre las valoraciones', ['default_value' => RatingSettings::DEFAULT_TEXTS['summaryHelp'], 'rows' => 2]),
+                $x->textarea('experience_help', 'Ayuda para reseñar servicios y equipos', ['default_value' => RatingSettings::DEFAULT_TEXTS['experienceHelp'], 'rows' => 2]),
+                $x->textarea('blog_help', 'Ayuda para comentar una guía', ['default_value' => RatingSettings::DEFAULT_TEXTS['blogHelp'], 'rows' => 2]),
                 $x->text('pending', 'Mensaje después de enviar una opinión', ['default_value' => RatingSettings::DEFAULT_TEXTS['pending']]),
             ]),
         ];

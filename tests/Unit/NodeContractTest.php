@@ -133,7 +133,7 @@ it('never puts null in a Node (top level, seo, price, rating, reviews, toc)', fu
     $post = $normalizer->normalize($nodes['blog post with reviews']);
     expect($post['rating'])->toMatchArray(['count' => 1, 'reviewCount' => 1])
         ->and($post['reviews'])->toHaveCount(1)
-        ->and($normalizer->normalize($nodes['city page']))->toHaveKey('rating')->not->toHaveKey('reviews');
+        ->and($normalizer->normalize($nodes['city page']))->toHaveKey('rating')->toHaveKey('reviews');
 })->with(['SCF' => [false], 'Rank Math' => [true]]);
 
 it('resolves node.lead: chosen service, automatic service on service pages, mode and stale values', function (): void {

@@ -172,7 +172,8 @@ it('turns the voter\'s quick vote into the review instead of rating twice', func
 });
 
 it('respects reviews disabled per type, auto-approval and the blacklist', function (): void {
-    $service = $this->reviews->create(signedRequest('/reviews', opinion('/alquiler-de-banos-portatiles/')));
+    $disabled = new ReviewsController(new ResponseCache, ($this->makeRatings)(['ratings' => ['types' => ['servicios' => ['reviews' => false]]]]), $this->nodes, new SignedRequestGuard(new Config, new RateLimiter), new ReviewInputValidator, new RateLimiter);
+    $service = $disabled->create(signedRequest('/reviews', opinion('/alquiler-de-banos-portatiles/')));
     expect($service->get_status())->toBe(403)
         ->and($service->get_data()['code'])->toBe('reviews_disabled');
 
@@ -199,5 +200,5 @@ it('embeds only approved reviews with text in the node, newest first', function 
         ->and($node['reviews'])->toHaveCount(1)
         ->and($node['reviews'][0])->toMatchArray(['id' => 2, 'author' => 'Luis Gómez', 'initials' => 'LG'])
         ->and($this->ratings->forNode($this->nodes->find('/')))->toBe([])
-        ->and($this->ratings->forNode($this->nodes->find('/alquiler-de-banos-portatiles/')))->not->toHaveKey('reviews');
+        ->and($this->ratings->forNode($this->nodes->find('/alquiler-de-banos-portatiles/')))->toHaveKey('reviews');
 });
